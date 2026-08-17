@@ -117,7 +117,7 @@ function VoidUI:pad(parent, t, l, r, b_)
 end
 
 function VoidUI:divider(parent, lo)
-	local d = self:frame(parent, UDim2.new(1, 0, 0, 1), nil, Color3.fromRGB(28, 28, 28))
+	local d = self:frame(parent, UDim2.new(1, 0, 0, 1), nil, Color3.fromRGB(58, 45, 10))
 	d.LayoutOrder = lo
 	return d
 end
@@ -201,7 +201,7 @@ end
 
 function VoidUI:accordion(parent, title, lo, startOpen)
 	local T = self.T
-	local header = self:frame(parent, UDim2.new(1, 0, 0, 32), nil, Color3.fromRGB(3, 3, 3))
+	local header = self:frame(parent, UDim2.new(1, 0, 0, 32), nil, Color3.fromRGB(17, 17, 22))
 	header.LayoutOrder = lo
 	self:corner(header, 6)
 	self:stroke(header, T.ACCENT, 1)
@@ -210,13 +210,13 @@ function VoidUI:accordion(parent, title, lo, startOpen)
 	local hitBtn = self:button(header, "", UDim2.new(1, 0, 1, 0), nil, T.BTN, T.TEXT)
 	hitBtn.BackgroundTransparency = 1
 	hitBtn.ZIndex = 5
-	local body = self:frame(parent, UDim2.new(1, 0, 0, 0), nil, Color3.fromRGB(3, 3, 3))
+	local body = self:frame(parent, UDim2.new(1, 0, 0, 0), nil, Color3.fromRGB(17, 17, 22))
 	body.LayoutOrder = lo + 1
 	body.AutomaticSize = Enum.AutomaticSize.Y
 	body.Visible = startOpen ~= false
 	self:corner(body, 6)
 	self:stroke(body, T.ACCENT, 1)
-	local inner = self:frame(body, UDim2.new(1, 0, 1, 0), nil, Color3.fromRGB(3, 3, 3), 0)
+	local inner = self:frame(body, UDim2.new(1, 0, 1, 0), nil, Color3.fromRGB(17, 17, 22), 0)
 	inner.AutomaticSize = Enum.AutomaticSize.Y
 	self:list(inner, 5)
 	self:pad(inner, 8, 8, 8, 8)
@@ -267,7 +267,7 @@ function VoidUI:inlinePickerDropdown(rowParent, overlayParent, config)
 	self:stroke(overlay, strokeCol, 1)
 
 	-- Header overlay (draggable)
-	local ohdr = self:frame(overlay, UDim2.new(1, 0, 0, 24), nil, Color3.fromRGB(10, 10, 18))
+	local ohdr = self:frame(overlay, UDim2.new(1, 0, 0, 24), nil, Color3.fromRGB(17, 17, 22))
 	self:corner(ohdr, 6)
 	local otitle = self:label(ohdr, config.label or "Select", UDim2.new(1, -28, 1, 0), UDim2.new(0, 8, 0, 0), strokeCol, 10)
 	otitle.Font = Enum.Font.GothamBold
@@ -416,7 +416,7 @@ end
 function VoidUI:accordionScroll(parent, title, lo, startOpen, config)
 	local cfg = config or {}
 	local T = self.T
-	local header = self:frame(parent, UDim2.new(1,0,0,32), nil, Color3.fromRGB(3,3,3))
+	local header = self:frame(parent, UDim2.new(1,0,0,32), nil, Color3.fromRGB(17, 17, 22))
 	header.LayoutOrder = lo
 	self:corner(header, 6)
 	self:stroke(header, T.ACCENT, 1)
@@ -426,7 +426,7 @@ function VoidUI:accordionScroll(parent, title, lo, startOpen, config)
 	hitBtn.BackgroundTransparency = 1
 	hitBtn.ZIndex = 5
 
-	local body = self:frame(parent, UDim2.new(1,0,0,0), nil, Color3.fromRGB(3,3,3))
+	local body = self:frame(parent, UDim2.new(1,0,0,0), nil, Color3.fromRGB(17, 17, 22))
 	body.LayoutOrder = lo + 1
 	body.Visible = startOpen ~= false
 	self:corner(body, 6)
@@ -553,8 +553,8 @@ function VoidUI:iconBtn(parent, icon, label)
 		if not accentBar.Visible then
 			b.BackgroundTransparency = 0.85
 			b.BackgroundColor3 = T.ACCENT
-			iconLbl.TextColor3 = Color3.fromRGB(160,150,220)
-			textLbl.TextColor3 = Color3.fromRGB(160,150,220)
+			iconLbl.TextColor3 = Color3.fromRGB(247, 177, 2)
+			textLbl.TextColor3 = Color3.fromRGB(247, 177, 2)
 		end
 	end)
 	b.MouseLeave:Connect(function()
@@ -569,7 +569,7 @@ function VoidUI:iconBtn(parent, icon, label)
 	local function setActive(s)
 		accentBar.Visible = s
 		if s then
-			b.BackgroundColor3 = Color3.fromRGB(20,20,50)
+			b.BackgroundColor3 = Color3.fromRGB(58, 45, 10)
 			b.BackgroundTransparency = 0
 			iconLbl.TextColor3 = T.ACCENT
 			textLbl.TextColor3 = T.ACCENT
@@ -587,7 +587,7 @@ end
 function VoidUI:sidebarDivider(parent)
 	local d = Instance.new("Frame", parent)
 	d.Size = UDim2.new(0,30,0,1)
-	d.BackgroundColor3 = Color3.fromRGB(28,28,40)
+	d.BackgroundColor3 = Color3.fromRGB(58, 45, 10)
 	d.BorderSizePixel = 0
 	return d
 end
@@ -656,16 +656,16 @@ end
 
 function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	local T = self.T
-	local card = self:frame(parent, UDim2.new(1, 0, 0, 52), nil, Color3.fromRGB(8, 8, 22))
+	local card = self:frame(parent, UDim2.new(1, 0, 0, 52), nil, Color3.fromRGB(24, 24, 31))
 	card.LayoutOrder = lo
 	self:corner(card, 6)
 	local stroke = Instance.new("UIStroke", card)
-	stroke.Color = Color3.fromRGB(80, 60, 160)
+	stroke.Color = Color3.fromRGB(58, 45, 10)
 	stroke.Thickness = 1
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 	
-	local badge = self:frame(card, UDim2.new(0, 74, 0, 14), UDim2.new(0, 8, 0, 4), Color3.fromRGB(60, 40, 120))
+	local badge = self:frame(card, UDim2.new(0, 74, 0, 14), UDim2.new(0, 8, 0, 4), Color3.fromRGB(58, 45, 10))
 	self:corner(badge, 4)
 	local badgeIcon = Instance.new("ImageLabel", badge)
 	badgeIcon.Size = UDim2.new(0, 10, 0, 10)
@@ -673,11 +673,11 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	badgeIcon.BackgroundTransparency = 1
 	badgeIcon.Image = "rbxthumb://type=Asset&id=5669312251&w=150&h=150"
 	badgeIcon.ScaleType = Enum.ScaleType.Fit
-	local badgeLbl = self:label(badge, "BUILT-IN", UDim2.new(1, -14, 1, 0), UDim2.new(0, 13, 0, 0), Color3.fromRGB(160, 130, 255), 7, Enum.TextXAlignment.Center)
+	local badgeLbl = self:label(badge, "BUILT-IN", UDim2.new(1, -14, 1, 0), UDim2.new(0, 13, 0, 0), Color3.fromRGB(247, 177, 2), 7, Enum.TextXAlignment.Center)
 	badgeLbl.Font = Enum.Font.GothamBold
 
 	
-	local nameLbl = self:label(card, name, UDim2.new(1, -100, 0, 16), UDim2.new(0, 8, 0, 18), Color3.fromRGB(180, 160, 255), 10)
+	local nameLbl = self:label(card, name, UDim2.new(1, -100, 0, 16), UDim2.new(0, 8, 0, 18), Color3.fromRGB(245, 243, 236), 10)
 	nameLbl.Font = Enum.Font.GothamBold
 	local descLbl = self:label(card, desc, UDim2.new(1, -100, 0, 13), UDim2.new(0, 8, 0, 35), T.DIM, 8)
 	descLbl.Font = Enum.Font.Gotham
@@ -692,8 +692,8 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	veliumLogo.ImageTransparency = 0.2
 
 	
-	local equipBtn = self:button(card, "⇄", UDim2.new(0, 28, 0, 28), UDim2.new(1, -36, 0.5, -14), Color3.fromRGB(60, 40, 120), Color3.fromRGB(180, 160, 255), 12)
-	self:stroke(equipBtn, Color3.fromRGB(80, 60, 160), 1)
+	local equipBtn = self:button(card, "⇄", UDim2.new(0, 28, 0, 28), UDim2.new(1, -36, 0.5, -14), Color3.fromRGB(58, 45, 10), Color3.fromRGB(247, 177, 2), 12)
+	self:stroke(equipBtn, Color3.fromRGB(58, 45, 10), 1)
 	equipBtn.MouseButton1Click:Connect(function() if onEquip then onEquip() end end)
 	return card
 end
@@ -725,7 +725,7 @@ function VoidUI:teamCard(parent, name, petNames, count, lo, onEquip, onDelete)
 	subContainer.BackgroundTransparency = 1
 	subContainer.BorderSizePixel = 0
 	subContainer.ScrollBarThickness = 2
-	subContainer.ScrollBarImageColor3 = Color3.fromRGB(127, 119, 221)
+	subContainer.ScrollBarImageColor3 = Color3.fromRGB(247, 177, 2)
 	subContainer.ScrollingDirection = Enum.ScrollingDirection.X
 	subContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
 	subContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -744,7 +744,7 @@ function VoidUI:teamCard(parent, name, petNames, count, lo, onEquip, onDelete)
 			lblPet.Font = Enum.Font.Gotham
 			lblPet.TextSize = 8
 			lblPet.Text = countStr .. petStr
-			lblPet.TextColor3 = Color3.fromRGB(255, 200, 80)
+			lblPet.TextColor3 = Color3.fromRGB(250, 222, 2)
 			lblPet.LayoutOrder = i * 3 - 2
 			local lblMut = Instance.new("TextLabel", subContainer)
 			lblMut.Size = UDim2.new(0, 0, 1, 0)
@@ -753,7 +753,7 @@ function VoidUI:teamCard(parent, name, petNames, count, lo, onEquip, onDelete)
 			lblMut.Font = Enum.Font.GothamBold
 			lblMut.TextSize = 8
 			lblMut.Text = "[" .. mutStr .. "]"
-			lblMut.TextColor3 = Color3.fromRGB(180, 120, 255)
+			lblMut.TextColor3 = Color3.fromRGB(199, 120, 2)
 			lblMut.LayoutOrder = i * 3 - 1
 		else
 			local lbl = Instance.new("TextLabel", subContainer)
@@ -821,14 +821,14 @@ function VoidUI:timingEditor(acInner, pageFrame, CFG, D, saveD)
 		"⏱  Timing Editor",
 		UDim2.new(1, 0, 0, 24),
 		nil,
-		Color3.fromRGB(20, 15, 40),
-		Color3.fromRGB(160, 140, 255),
+		Color3.fromRGB(58, 45, 10),
+		Color3.fromRGB(247, 177, 2),
 		9
 	)
-	self:stroke(teBtn, Color3.fromRGB(80, 60, 140), 1)
+	self:stroke(teBtn, Color3.fromRGB(58, 45, 10), 1)
 	teBtn.TextXAlignment = Enum.TextXAlignment.Left
 	self:pad(teBtn, 0, 8, 8, 0)
-	local teBtnArrow = self:label(teBtn, ">", UDim2.new(0, 16, 1, 0), UDim2.new(1, -20, 0, 0), Color3.fromRGB(100, 80, 180), 11, Enum.TextXAlignment.Center)
+	local teBtnArrow = self:label(teBtn, ">", UDim2.new(0, 16, 1, 0), UDim2.new(1, -20, 0, 0), Color3.fromRGB(199, 120, 2), 11, Enum.TextXAlignment.Center)
 	teBtnArrow.Font = Enum.Font.GothamBold
 
 	local overlay = self:frame(pageFrame, UDim2.new(1, 0, 1, 0), nil, T.BG)
@@ -855,7 +855,7 @@ function VoidUI:timingEditor(acInner, pageFrame, CFG, D, saveD)
 	local function secHdr(label, lo)
 		local f = self:frame(inner, UDim2.new(1, 0, 0, 14), nil, T.BG, 1)
 		f.LayoutOrder = lo
-		local l = self:label(f, label, UDim2.new(1, 0, 1, 0), nil, Color3.fromRGB(70, 70, 110), 8)
+		local l = self:label(f, label, UDim2.new(1, 0, 1, 0), nil, Color3.fromRGB(166, 164, 160), 8)
 		l.Font = Enum.Font.GothamBold
 		return f
 	end
@@ -873,13 +873,13 @@ function VoidUI:timingEditor(acInner, pageFrame, CFG, D, saveD)
 
 		local bdg = self:frame(row, UDim2.new(0, 34, 0, 14), UDim2.new(1, -104, 0.5, -7), badgeColor)
 		self:corner(bdg, 3)
-		local bdgLbl = self:label(bdg, badge, UDim2.new(1, 0, 1, 0), nil, Color3.fromRGB(200, 200, 220), 7, Enum.TextXAlignment.Center)
+		local bdgLbl = self:label(bdg, badge, UDim2.new(1, 0, 1, 0), nil, Color3.fromRGB(245, 243, 236), 7, Enum.TextXAlignment.Center)
 		bdgLbl.Font = Enum.Font.GothamBold
 
 		local inp = self:input(row, string.format("%.2f", D.autoHatch[dataKey]), "", UDim2.new(0, 46, 0, 18), UDim2.new(1, -58, 0.5, -9))
 		inp.ZIndex = 5
 
-		local secLbl = self:label(row, " sec", UDim2.new(0, 24, 1, 0), UDim2.new(1, -24, 0, 0), Color3.fromRGB(60, 60, 90), 8, Enum.TextXAlignment.Left)
+		local secLbl = self:label(row, " sec", UDim2.new(0, 24, 1, 0), UDim2.new(1, -24, 0, 0), Color3.fromRGB(166, 164, 160), 8, Enum.TextXAlignment.Left)
 		secLbl.Font = Enum.Font.Gotham
 
 		local valLbl = self:label(row, string.format("%.2f", D.autoHatch[dataKey]), UDim2.new(0, 0, 1, 0), UDim2.new(0, 0, 0, 0), T.ACCENT, 1)
@@ -901,7 +901,7 @@ function VoidUI:timingEditor(acInner, pageFrame, CFG, D, saveD)
 	end
 
 	local function totalRow(label, id, lo, accent)
-		local row = self:frame(inner, UDim2.new(1, 0, 0, 22), nil, Color3.fromRGB(8, 8, 18))
+		local row = self:frame(inner, UDim2.new(1, 0, 0, 22), nil, Color3.fromRGB(17, 17, 22))
 		row.LayoutOrder = lo
 		self:corner(row, 4)
 		self:stroke(row, accent and T.ACCENT or T.STROKE, 1)
@@ -929,9 +929,9 @@ function VoidUI:timingEditor(acInner, pageFrame, CFG, D, saveD)
 		if totalLabels["grand"] then totalLabels["grand"].Text = string.format("%.2f sec", koi + seal) end
 	end
 
-	local COLOR_ALL  = Color3.fromRGB(30, 20, 50)
-	local COLOR_KOI  = Color3.fromRGB(10, 20, 50)
-	local COLOR_SEAL = Color3.fromRGB(10, 40, 20)
+	local COLOR_ALL  = Color3.fromRGB(58, 45, 10)
+	local COLOR_KOI  = Color3.fromRGB(24, 24, 31)
+	local COLOR_SEAL = Color3.fromRGB(17, 17, 22)
 
 	secHdr("EQUIP / UNEQUIP", 1)
 	kvRow("Equip delay (per pet)",   "ALL", COLOR_ALL,  "ahEquipDelay",     2)
@@ -1046,7 +1046,7 @@ function VoidUI:modePickerRow(parent, config)
 
 	local arrowLbl = self:label(row, "▼", UDim2.new(0,14,1,0), UDim2.new(1,-18,0,0), T.DIM, 8, Enum.TextXAlignment.Center)
 
-	local overlay = self:frame(overlayParent, UDim2.new(1,0,0,0), UDim2.new(0,0,0,0), Color3.fromRGB(3,3,3))
+	local overlay = self:frame(overlayParent, UDim2.new(1,0,0,0), UDim2.new(0,0,0,0), Color3.fromRGB(17, 17, 22))
 	overlay.AutomaticSize = Enum.AutomaticSize.Y
 	overlay.Visible = false
 	overlay.ZIndex = 40
@@ -1060,7 +1060,7 @@ function VoidUI:modePickerRow(parent, config)
 	ovScroll.ScrollBarImageColor3 = T.ACCENT
 	ovScroll.ZIndex = 40
 
-	local innerList = self:frame(ovScroll, UDim2.new(1,0,0,0), nil, Color3.fromRGB(3,3,3), 0)
+	local innerList = self:frame(ovScroll, UDim2.new(1,0,0,0), nil, Color3.fromRGB(17, 17, 22), 0)
 	innerList.AutomaticSize = Enum.AutomaticSize.Y
 	self:list(innerList, 4)
 	self:pad(innerList, 6, 6, 6, 6)
@@ -1071,7 +1071,7 @@ function VoidUI:modePickerRow(parent, config)
 	local function refreshCards()
 		for _, ref in ipairs(cardRefs) do
 			local isSel = ref.key == selectedKey
-			ref.card.BackgroundColor3   = isSel and Color3.fromRGB(30,20,60) or Color3.fromRGB(10,10,18)
+			ref.card.BackgroundColor3   = isSel and Color3.fromRGB(90, 68, 15) or Color3.fromRGB(24, 24, 31)
 			local s = ref.card:FindFirstChildOfClass("UIStroke")
 			if s then s.Color = isSel and T.ACCENT or T.STROKE end
 			ref.badge.BackgroundColor3  = isSel and T.ACCENT or Color3.fromRGB(40,30,80)
@@ -1082,7 +1082,7 @@ function VoidUI:modePickerRow(parent, config)
 	for i, mode in ipairs(modes) do
 		local isSel = mode.key == selectedKey
 		local card = self:frame(innerList, UDim2.new(1,0,0,46), nil,
-			isSel and Color3.fromRGB(30,20,60) or Color3.fromRGB(10,10,18))
+			isSel and Color3.fromRGB(90, 68, 15) or Color3.fromRGB(24, 24, 31))
 		card.LayoutOrder = i
 		card.ZIndex = 41
 		self:corner(card, 5)
@@ -1093,7 +1093,7 @@ function VoidUI:modePickerRow(parent, config)
 		badge.ZIndex = 42
 		self:corner(badge, 4)
 		local badgeLbl = self:label(badge, tostring(mode.key), UDim2.new(1,0,1,0), nil,
-			Color3.fromRGB(255,255,255), 10, Enum.TextXAlignment.Center)
+			Color3.fromRGB(22, 22, 22), 10, Enum.TextXAlignment.Center)
 		badgeLbl.Font = Enum.Font.GothamBold
 		badgeLbl.ZIndex = 42
 
