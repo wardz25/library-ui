@@ -665,7 +665,7 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 	
-	local badge = self:frame(card, UDim2.new(0, 74, 0, 14), UDim2.new(0, 8, 0, 4), Color3.fromRGB(58, 45, 10))
+	local badge = self:frame(card, UDim2.new(0, 74, 0, 14), UDim2.new(0, 58, 0, 4), Color3.fromRGB(58, 45, 10))
 	self:corner(badge, 4)
 	local badgeIcon = Instance.new("ImageLabel", badge)
 	badgeIcon.Size = UDim2.new(0, 10, 0, 10)
@@ -1071,25 +1071,25 @@ function VoidUI:modePickerRow(parent, config)
 	local function refreshCards()
 		for _, ref in ipairs(cardRefs) do
 			local isSel = ref.key == selectedKey
-			ref.card.BackgroundColor3   = isSel and Color3.fromRGB(90, 68, 15) or Color3.fromRGB(24, 24, 31)
+			ref.card.BackgroundColor3   = isSel and Color3.fromRGB(247, 177, 2) or Color3.fromRGB(24, 24, 31)
 			local s = ref.card:FindFirstChildOfClass("UIStroke")
 			if s then s.Color = isSel and T.ACCENT or T.STROKE end
-			ref.badge.BackgroundColor3  = isSel and T.ACCENT or Color3.fromRGB(40,30,80)
-			ref.nameLbl.TextColor3      = isSel and T.ACCENT or T.TEXT
+			ref.badge.BackgroundColor3  = isSel and Color3.fromRGB(22, 22, 22) or T.STROKE
+			ref.nameLbl.TextColor3      = isSel and Color3.fromRGB(22, 22, 22) or T.TEXT
 		end
 	end
 
 	for i, mode in ipairs(modes) do
 		local isSel = mode.key == selectedKey
 		local card = self:frame(innerList, UDim2.new(1,0,0,46), nil,
-			isSel and Color3.fromRGB(90, 68, 15) or Color3.fromRGB(24, 24, 31))
+			isSel and Color3.fromRGB(247, 177, 2) or Color3.fromRGB(24, 24, 31))
 		card.LayoutOrder = i
 		card.ZIndex = 41
 		self:corner(card, 5)
 		self:stroke(card, isSel and T.ACCENT or T.STROKE, 1)
 
 		local badge = self:frame(card, UDim2.new(0,22,0,22), UDim2.new(0,6,0.5,-11),
-			isSel and T.ACCENT or Color3.fromRGB(40,30,80))
+			isSel and Color3.fromRGB(22, 22, 22) or T.STROKE)
 		badge.ZIndex = 42
 		self:corner(badge, 4)
 		local badgeLbl = self:label(badge, tostring(mode.key), UDim2.new(1,0,1,0), nil,
