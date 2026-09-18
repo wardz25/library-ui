@@ -687,7 +687,7 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	veliumLogo.Size = UDim2.new(0, 32, 0, 32)
 	veliumLogo.Position = UDim2.new(1, -68, 0.5, -16)
 	veliumLogo.BackgroundTransparency = 1
-	veliumLogo.Image = "rbxthumb://type=Asset&id=115906524559615&w=150&h=150"
+	veliumLogo.Image = "rbxthumb://type=Asset&id=129670012764316&w=150&h=150"
 	veliumLogo.ScaleType = Enum.ScaleType.Fit
 	veliumLogo.ImageTransparency = 0.2
 
