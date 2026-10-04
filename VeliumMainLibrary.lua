@@ -117,7 +117,7 @@ function VoidUI:pad(parent, t, l, r, b_)
 end
 
 function VoidUI:divider(parent, lo)
-	local d = self:frame(parent, UDim2.new(1, 0, 0, 1), nil, Color3.fromRGB(58, 45, 10))
+	local d = self:frame(parent, UDim2.new(1, 0, 0, 1), nil, Color3.fromRGB(24, 66, 60))
 	d.LayoutOrder = lo
 	return d
 end
@@ -553,8 +553,8 @@ function VoidUI:iconBtn(parent, icon, label)
 		if not accentBar.Visible then
 			b.BackgroundTransparency = 0.85
 			b.BackgroundColor3 = T.ACCENT
-			iconLbl.TextColor3 = Color3.fromRGB(247, 177, 2)
-			textLbl.TextColor3 = Color3.fromRGB(247, 177, 2)
+			iconLbl.TextColor3 = Color3.fromRGB(128, 255, 234)
+			textLbl.TextColor3 = Color3.fromRGB(128, 255, 234)
 		end
 	end)
 	b.MouseLeave:Connect(function()
@@ -569,7 +569,7 @@ function VoidUI:iconBtn(parent, icon, label)
 	local function setActive(s)
 		accentBar.Visible = s
 		if s then
-			b.BackgroundColor3 = Color3.fromRGB(58, 45, 10)
+			b.BackgroundColor3 = Color3.fromRGB(24, 66, 60)
 			b.BackgroundTransparency = 0
 			iconLbl.TextColor3 = T.ACCENT
 			textLbl.TextColor3 = T.ACCENT
@@ -587,7 +587,7 @@ end
 function VoidUI:sidebarDivider(parent)
 	local d = Instance.new("Frame", parent)
 	d.Size = UDim2.new(0,30,0,1)
-	d.BackgroundColor3 = Color3.fromRGB(58, 45, 10)
+	d.BackgroundColor3 = Color3.fromRGB(24, 66, 60)
 	d.BorderSizePixel = 0
 	return d
 end
@@ -660,12 +660,12 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	card.LayoutOrder = lo
 	self:corner(card, 6)
 	local stroke = Instance.new("UIStroke", card)
-	stroke.Color = Color3.fromRGB(58, 45, 10)
+	stroke.Color = Color3.fromRGB(24, 66, 60)
 	stroke.Thickness = 1
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 	
-	local badge = self:frame(card, UDim2.new(0, 74, 0, 14), UDim2.new(0, 58, 0, 4), Color3.fromRGB(58, 45, 10))
+	local badge = self:frame(card, UDim2.new(0, 74, 0, 14), UDim2.new(0, 58, 0, 4), Color3.fromRGB(24, 66, 60))
 	self:corner(badge, 4)
 	local badgeIcon = Instance.new("ImageLabel", badge)
 	badgeIcon.Size = UDim2.new(0, 10, 0, 10)
@@ -673,7 +673,7 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	badgeIcon.BackgroundTransparency = 1
 	badgeIcon.Image = "rbxthumb://type=Asset&id=5669312251&w=150&h=150"
 	badgeIcon.ScaleType = Enum.ScaleType.Fit
-	local badgeLbl = self:label(badge, "BUILT-IN", UDim2.new(1, -14, 1, 0), UDim2.new(0, 13, 0, 0), Color3.fromRGB(247, 177, 2), 7, Enum.TextXAlignment.Center)
+	local badgeLbl = self:label(badge, "BUILT-IN", UDim2.new(1, -14, 1, 0), UDim2.new(0, 13, 0, 0), Color3.fromRGB(128, 255, 234), 7, Enum.TextXAlignment.Center)
 	badgeLbl.Font = Enum.Font.GothamBold
 
 	
@@ -693,8 +693,8 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	veliumLogo.ImageColor3 = Color3.fromRGB(255, 255, 255)
 
 	
-	local equipBtn = self:button(card, "⇄", UDim2.new(0, 28, 0, 28), UDim2.new(1, -36, 0.5, -14), Color3.fromRGB(58, 45, 10), Color3.fromRGB(247, 177, 2), 12)
-	self:stroke(equipBtn, Color3.fromRGB(58, 45, 10), 1)
+	local equipBtn = self:button(card, "⇄", UDim2.new(0, 28, 0, 28), UDim2.new(1, -36, 0.5, -14), Color3.fromRGB(24, 66, 60), Color3.fromRGB(128, 255, 234), 12)
+	self:stroke(equipBtn, Color3.fromRGB(24, 66, 60), 1)
 	equipBtn.MouseButton1Click:Connect(function() if onEquip then onEquip() end end)
 	return card
 end
@@ -726,7 +726,7 @@ function VoidUI:teamCard(parent, name, petNames, count, lo, onEquip, onDelete)
 	subContainer.BackgroundTransparency = 1
 	subContainer.BorderSizePixel = 0
 	subContainer.ScrollBarThickness = 2
-	subContainer.ScrollBarImageColor3 = Color3.fromRGB(247, 177, 2)
+	subContainer.ScrollBarImageColor3 = Color3.fromRGB(128, 255, 234)
 	subContainer.ScrollingDirection = Enum.ScrollingDirection.X
 	subContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
 	subContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -745,7 +745,7 @@ function VoidUI:teamCard(parent, name, petNames, count, lo, onEquip, onDelete)
 			lblPet.Font = Enum.Font.Gotham
 			lblPet.TextSize = 8
 			lblPet.Text = countStr .. petStr
-			lblPet.TextColor3 = Color3.fromRGB(250, 222, 2)
+			lblPet.TextColor3 = Color3.fromRGB(128, 255, 234)
 			lblPet.LayoutOrder = i * 3 - 2
 			local lblMut = Instance.new("TextLabel", subContainer)
 			lblMut.Size = UDim2.new(0, 0, 1, 0)
@@ -754,7 +754,7 @@ function VoidUI:teamCard(parent, name, petNames, count, lo, onEquip, onDelete)
 			lblMut.Font = Enum.Font.GothamBold
 			lblMut.TextSize = 8
 			lblMut.Text = "[" .. mutStr .. "]"
-			lblMut.TextColor3 = Color3.fromRGB(199, 120, 2)
+			lblMut.TextColor3 = Color3.fromRGB(52, 160, 150)
 			lblMut.LayoutOrder = i * 3 - 1
 		else
 			local lbl = Instance.new("TextLabel", subContainer)
@@ -822,14 +822,14 @@ function VoidUI:timingEditor(acInner, pageFrame, CFG, D, saveD)
 		"⏱  Timing Editor",
 		UDim2.new(1, 0, 0, 24),
 		nil,
-		Color3.fromRGB(58, 45, 10),
-		Color3.fromRGB(247, 177, 2),
+		Color3.fromRGB(24, 66, 60),
+		Color3.fromRGB(128, 255, 234),
 		9
 	)
-	self:stroke(teBtn, Color3.fromRGB(58, 45, 10), 1)
+	self:stroke(teBtn, Color3.fromRGB(24, 66, 60), 1)
 	teBtn.TextXAlignment = Enum.TextXAlignment.Left
 	self:pad(teBtn, 0, 8, 8, 0)
-	local teBtnArrow = self:label(teBtn, ">", UDim2.new(0, 16, 1, 0), UDim2.new(1, -20, 0, 0), Color3.fromRGB(199, 120, 2), 11, Enum.TextXAlignment.Center)
+	local teBtnArrow = self:label(teBtn, ">", UDim2.new(0, 16, 1, 0), UDim2.new(1, -20, 0, 0), Color3.fromRGB(52, 160, 150), 11, Enum.TextXAlignment.Center)
 	teBtnArrow.Font = Enum.Font.GothamBold
 
 	local overlay = self:frame(pageFrame, UDim2.new(1, 0, 1, 0), nil, T.BG)
@@ -930,7 +930,7 @@ function VoidUI:timingEditor(acInner, pageFrame, CFG, D, saveD)
 		if totalLabels["grand"] then totalLabels["grand"].Text = string.format("%.2f sec", koi + seal) end
 	end
 
-	local COLOR_ALL  = Color3.fromRGB(58, 45, 10)
+	local COLOR_ALL  = Color3.fromRGB(24, 66, 60)
 	local COLOR_KOI  = Color3.fromRGB(24, 24, 31)
 	local COLOR_SEAL = Color3.fromRGB(17, 17, 22)
 
@@ -1072,7 +1072,7 @@ function VoidUI:modePickerRow(parent, config)
 	local function refreshCards()
 		for _, ref in ipairs(cardRefs) do
 			local isSel = ref.key == selectedKey
-			ref.card.BackgroundColor3   = isSel and Color3.fromRGB(247, 177, 2) or Color3.fromRGB(24, 24, 31)
+			ref.card.BackgroundColor3   = isSel and Color3.fromRGB(128, 255, 234) or Color3.fromRGB(24, 24, 31)
 			local s = ref.card:FindFirstChildOfClass("UIStroke")
 			if s then s.Color = isSel and T.ACCENT or T.STROKE end
 			ref.badge.BackgroundColor3  = isSel and Color3.fromRGB(22, 22, 22) or T.STROKE
@@ -1083,7 +1083,7 @@ function VoidUI:modePickerRow(parent, config)
 	for i, mode in ipairs(modes) do
 		local isSel = mode.key == selectedKey
 		local card = self:frame(innerList, UDim2.new(1,0,0,46), nil,
-			isSel and Color3.fromRGB(247, 177, 2) or Color3.fromRGB(24, 24, 31))
+			isSel and Color3.fromRGB(128, 255, 234) or Color3.fromRGB(24, 24, 31))
 		card.LayoutOrder = i
 		card.ZIndex = 41
 		self:corner(card, 5)

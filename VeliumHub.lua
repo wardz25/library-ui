@@ -90,20 +90,20 @@ BG = Color3.fromRGB(22, 22, 22),
 PANEL = Color3.fromRGB(17, 17, 22),
 BTN = Color3.fromRGB(24, 24, 31),
 SIDEBAR = Color3.fromRGB(17, 17, 22),
-STROKE = Color3.fromRGB(58, 45, 10),
-ACCENT = Color3.fromRGB(247, 177, 2),
+STROKE = Color3.fromRGB(24, 66, 60),
+ACCENT = Color3.fromRGB(128, 255, 234),
 TEXT = Color3.fromRGB(245, 243, 236),
 DIM = Color3.fromRGB(166, 164, 160),
-SEL_BG  = Color3.fromRGB(26, 20, 0),      -- #1A1400, near-black warm
-SEL_TXT = Color3.fromRGB(247, 177, 2),    -- #F7B102, gold — matches T.ACCENT exactly
+SEL_BG  = Color3.fromRGB(14, 40, 36),      -- near-black teal
+SEL_TXT = Color3.fromRGB(128, 255, 234),    -- mint — matches T.ACCENT exactly
 SUCCESS = Color3.fromRGB(80, 210, 100),
 ERROR = Color3.fromRGB(215, 70, 70),
-TOGGLE_ON = Color3.fromRGB(247, 177, 2),
-TOGGLE_OFF = Color3.fromRGB(58, 45, 10),
-ACTIVE_BG = Color3.fromRGB(58, 45, 10),
-ACTIVE_TXT = Color3.fromRGB(250, 222, 2),
+TOGGLE_ON = Color3.fromRGB(128, 255, 234),
+TOGGLE_OFF = Color3.fromRGB(24, 66, 60),
+ACTIVE_BG = Color3.fromRGB(24, 66, 60),
+ACTIVE_TXT = Color3.fromRGB(128, 255, 234),
 DARK_CARD = Color3.fromRGB(17, 17, 22),
-PHASE2 = Color3.fromRGB(199, 120, 2),
+PHASE2 = Color3.fromRGB(52, 160, 150),
 }
 UI.T = T
 local TIMING = {
@@ -1051,13 +1051,13 @@ for _, bt in ipairs(_G._NH_BUILTIN_TEAMS) do
 if bt.name == name then isBuiltin = true; break end
 end
 end
-local bg = (isBuiltin and Color3.fromRGB(58, 45, 10)) or Color3.fromRGB(22, 22, 22)
-local txt = (isBuiltin and Color3.fromRGB(250, 222, 2)) or T2.TEXT
-local stroke = (isBuiltin and Color3.fromRGB(58, 45, 10)) or T2.STROKE
+local bg = (isBuiltin and Color3.fromRGB(24, 66, 60)) or Color3.fromRGB(22, 22, 22)
+local txt = (isBuiltin and Color3.fromRGB(128, 255, 234)) or T2.TEXT
+local stroke = (isBuiltin and Color3.fromRGB(24, 66, 60)) or T2.STROKE
 if isSelected then
-bg = (isBuiltin and Color3.fromRGB(247, 177, 2)) or T2.SEL_BG
-txt = Color3.fromRGB(22, 22, 22)
-stroke = (isBuiltin and Color3.fromRGB(199, 120, 2)) or T2.ACCENT
+bg = (isBuiltin and Color3.fromRGB(128, 255, 234)) or T2.SEL_BG
+txt = (isBuiltin and Color3.fromRGB(16, 42, 38)) or T2.SEL_TXT
+stroke = (isBuiltin and Color3.fromRGB(52, 160, 150)) or T2.ACCENT
 end
 local btn = UI2:button(parent, name, UDim2.new(1,0,0,22), nil, bg, txt, 9)
 btn.LayoutOrder = i; btn.TextXAlignment = Enum.TextXAlignment.Left
@@ -1285,11 +1285,11 @@ local confirmOv
 local modalRoot = UI:frame(ScreenGui, UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), T.BG, 1)
 modalRoot.Name = "VeliumModal"
 modalRoot.ZIndex = 200
-local tabHatch = speedTabs:CreateTab({"HATCH", "rbxassetid://118973578063038"})
-local tabAuto = speedTabs:CreateTab({"AUTOMATION", "rbxassetid://118973578063038"})
-local tabTeams = speedTabs:CreateTab({"TEAMS", "rbxassetid://118973578063038"})
-local tabWebhook = speedTabs:CreateTab({"WEBHOOK", "rbxassetid://118973578063038"})
-local tabMisc = speedTabs:CreateTab({"MISC", "rbxassetid://118973578063038"})
+local tabHatch = speedTabs:CreateTab({"HATCH", ""})
+local tabAuto = speedTabs:CreateTab({"AUTOMATION", ""})
+local tabTeams = speedTabs:CreateTab({"TEAMS", ""})
+local tabWebhook = speedTabs:CreateTab({"WEBHOOK", ""})
+local tabMisc = speedTabs:CreateTab({"MISC", ""})
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
@@ -3066,11 +3066,11 @@ local function makeBadge(card, x, y)
 	local badge = Instance.new("Frame", card)
 	badge.Size = UDim2.new(0, 62, 0, 15)
 	badge.Position = UDim2.new(0, x, 0, y)
-	badge.BackgroundColor3 = Color3.fromRGB(58, 45, 10)
+	badge.BackgroundColor3 = Color3.fromRGB(24, 66, 60)
 	badge.BorderSizePixel = 0
 	local c = Instance.new("UICorner", badge); c.CornerRadius = UDim.new(1, 0)
 	local stroke = Instance.new("UIStroke", badge)
-	stroke.Color = Color3.fromRGB(199, 120, 2)
+	stroke.Color = Color3.fromRGB(52, 160, 150)
 	stroke.Thickness = 1
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	-- Icon prefix inside badge
@@ -3079,7 +3079,7 @@ local function makeBadge(card, x, y)
 	icon.Position = UDim2.new(0, 2, 0, 0)
 	icon.BackgroundTransparency = 1
 	icon.Text = "âš¡"
-	icon.TextColor3 = Color3.fromRGB(247, 177, 2)
+	icon.TextColor3 = Color3.fromRGB(128, 255, 234)
 	icon.Font = Enum.Font.GothamBold
 	icon.TextSize = 8
 	icon.TextXAlignment = Enum.TextXAlignment.Center
@@ -3101,10 +3101,10 @@ local function makeSwapBtn(card, onEquip)
 	local btn = Instance.new("TextButton", card)
 	btn.Size = UDim2.new(0, 30, 0, 30)
 	btn.Position = UDim2.new(1, -36, 0.5, -15)
-	btn.BackgroundColor3 = Color3.fromRGB(58, 45, 10)
+	btn.BackgroundColor3 = Color3.fromRGB(24, 66, 60)
 	btn.BorderSizePixel = 0
 	btn.Text = "â‡„"
-	btn.TextColor3 = Color3.fromRGB(247, 177, 2)
+	btn.TextColor3 = Color3.fromRGB(128, 255, 234)
 	btn.Font = Enum.Font.GothamBold
 	btn.TextSize = 14
 	local c = Instance.new("UICorner", btn); c.CornerRadius = UDim.new(0, 7)
@@ -3141,12 +3141,12 @@ local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
 	card.LayoutOrder = order
 	local co = Instance.new("UICorner", card); co.CornerRadius = UDim.new(0, 7)
 	local st = Instance.new("UIStroke", card)
-	st.Color = Color3.fromRGB(58, 45, 10); st.Thickness = 1
+	st.Color = Color3.fromRGB(24, 66, 60); st.Thickness = 1
 	-- Left purple accent bar
 	local accentBar = Instance.new("Frame", card)
 	accentBar.Size = UDim2.new(0, 3, 1, -10)
 	accentBar.Position = UDim2.new(0, 0, 0, 5)
-	accentBar.BackgroundColor3 = Color3.fromRGB(247, 177, 2)
+	accentBar.BackgroundColor3 = Color3.fromRGB(128, 255, 234)
 	accentBar.BorderSizePixel = 0
 	local ab = Instance.new("UICorner", accentBar); ab.CornerRadius = UDim.new(0, 4)
 

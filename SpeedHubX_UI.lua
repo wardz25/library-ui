@@ -6,7 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 
 local Custom = {} do
-  Custom.ColorRGB = Color3.fromRGB(247, 177, 2) -- Velium gold (was red)
+  Custom.ColorRGB = Color3.fromRGB(128, 255, 234) -- Velium mint (was red)
 
   function Custom:Create(Name, Properties, Parent)
     local _instance = Instance.new(Name)
@@ -2019,7 +2019,7 @@ function Speed_Library:CreateWindow(Config)
           TextSize = 12,
           BackgroundColor3 = Color3.fromRGB(0, 0, 0),
           BackgroundTransparency = 0.9,
-          BorderColor3 = Color3.fromRGB(58, 45, 10),
+          BorderColor3 = Color3.fromRGB(24, 66, 60),
           BorderSizePixel = 1,
           Size = UDim2.new(1, 0, 0, 20),
           Name = "SearchBar"
