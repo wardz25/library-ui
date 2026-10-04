@@ -1850,7 +1850,7 @@ statusLbl.Text = "Cycle " .. cycle
 statusLbl.TextColor3 = T.SUCCESS
 addLog(string.format("--- Cycle %d ---", cycle), T.ACCENT)
 local ok, err = pcall(runHatchCycle, function(t,c) statusLbl.Text = t; statusLbl.TextColor3 = c end, addLog)
-if not ok then addLog("Error: " .. tostring(err), T.ERROR); print("[Velium Hub] HATCH TRACEBACK: " .. tostring(debug.traceback(err, 2))) end
+if not ok then addLog("Error: " .. tostring(err), T.ERROR); print("[Velium Hub] HATCH FAIL phase=" .. tostring(HatchTrack.phase) .. " err=" .. tostring(err)) end
 if not hatchRunning then break end
 task.wait(1)
 end
@@ -2667,6 +2667,7 @@ end
 end
 runHatchCycle = function(statusFn, logFn)
 local a = cfg.autoHatch
+HatchTrack.phase = "sell"
 local hasSellPets = a.sellPets and next(a.sellPets)
 local sellAllMode = a.sellAll == true
 if a.sellEnabled ~= false and (hasSellPets or sellAllMode) then
@@ -2694,6 +2695,7 @@ logFn("Selling selected pets one by one...", T.ACCENT)
 sellSelectedOneByOne(logFn)
 end
 end
+HatchTrack.phase = "cd"
 if a.teamCD then logFn("Equipping CD team...", T.DIM); wearTeam(a.teamCD) end
 local existingEggs = 0
 for _, obj in ipairs(CS:GetTagged("PetEggServer")) do
@@ -2706,11 +2708,13 @@ if existingEggs > 0 then
 logFn(string.format("Found %d existing eggs, skipping place", existingEggs), T.DIM)
 else
 logFn("Placing eggs...", T.ACCENT)
+HatchTrack.phase = "place"
 placed = placeEggs(a.eggName, a.eggCount, a.eggSpacing)
 if placed == 0 then logFn("No eggs to place!", T.ERROR); return end
 logFn(string.format("Placed %d eggs, waiting for hatch...", placed), T.ACCENT)
 end
 task.wait(2)
+HatchTrack.phase = "wait"
 local timeout = os.clock() + 120
 while os.clock() < timeout do
 local eggCount = 0
@@ -2728,6 +2732,7 @@ hatchAllEggs()
 end
 task.wait(1)
 end
+HatchTrack.phase = "koi"
 if a.teamKoi then
 logFn("Equipping Koi team...", T.ACCENT)
 wearTeam(a.teamKoi)
@@ -2737,6 +2742,7 @@ local beforeHatch = {}
 pcall(function() for uuid in pairs(getInventory()) do beforeHatch[uuid] = true end end)
 hatchAllEggs()
 task.wait(1)
+HatchTrack.phase = "fire"
 local hatchedNow = {}
 pcall(function()
 local invNow = getInventory()
@@ -2776,8 +2782,10 @@ teamLines[label] = table.concat(parts, ", ")
 end
 end
 end
+HatchTrack.phase = "webhook"
 pcall(function() sendHatchWebhook(a.eggName, hatchedNow, teamLines) end)
 end
+HatchTrack.phase = "special"
 if a.specialBronto and a.specialBronto.enabled then
 local brontoThresh = a.brontoThresh or 4
 local selPets = a.specialBronto.pets or {}
@@ -2811,9 +2819,11 @@ if kept > 0 then
 logFn(string.format("Kept %d pets for Bronto (heavy >= %.1fg or special)", kept, brontoThresh), T.ACCENT)
 end
 end
+HatchTrack.phase = "fav"
 if a.favDelay and a.favDelay > 0 then
 favAllPets(a.favDelay)
 end
+HatchTrack.phase = "autosell"
 if a.sellEnabled ~= false and a.autoSellWhenFull then
 local inv = getInventory()
 local count = 0
