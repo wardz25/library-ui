@@ -1665,6 +1665,7 @@ return inp
 end
 local hatchAcc = UI:accordion(hScroll, "AUTO HATCH", 1, true)
 local hatchInner = hatchAcc.Inner
+do
 local eggPlaceLbl = UI:label(hatchInner, "EGG TO PLACE", UDim2.new(1,0,0,14), nil, T.ACCENT, 10)
 eggPlaceLbl.Font = Enum.Font.GothamBold; eggPlaceLbl.LayoutOrder = 1
 local eggList = {}
@@ -1721,6 +1722,7 @@ eggSearchInp.Text = ""
 rebuildEggList("")
 end
 end)
+end
 do
 local row = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
 row.LayoutOrder = 4
@@ -1769,6 +1771,7 @@ makeTeamDD(hatchInner, "CD Team (Reduce cooldown)", "teamCD", 10)
 makeTeamDD(hatchInner, "Koi Team", "teamKoi", 13)
 makeTeamDD(hatchInner, "Seal Team (Sell)", "teamSeal", 16)
 makeTeamDD(hatchInner, "Bronto Team (Heavy hatch)", "teamBronto", 19)
+do
 local espRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
 espRow.LayoutOrder = 25
 UI:corner(espRow, 5); UI:stroke(espRow, T.STROKE, 1)
@@ -1788,6 +1791,7 @@ local timingTeBtn, timingOverlay = UI:timingEditor(timingBtnRow, PageHatch, TIMI
 if timingTeBtn then
 timingBtnRow.Size = UDim2.new(1,0,0,44)
 end
+end
 do
 local row = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
 row.LayoutOrder = 31
@@ -1803,6 +1807,7 @@ end)
 UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.autoFeedEnabled or false,
 function(val) cfg.autoHatch.autoFeedEnabled = val; saveConfig() end)
 end
+do
 local logPanel = UI:frame(hatchInner, UDim2.new(1,0,0,80), nil, T.PANEL)
 logPanel.LayoutOrder = 40
 UI:stroke(logPanel, T.STROKE, 1)
@@ -1869,6 +1874,7 @@ end)
 end
 end
 local hatchToggle = UI:toggle(statusRow, UDim2.new(1,-48,0.5,-11), false, onHatchToggle)
+end
 do
 local brontoHdr = UI:label(hatchInner, "⭐ SPECIAL PET TO BRONTO", UDim2.new(1,0,0,16), nil, T.ACCENT, 10)
 brontoHdr.Font = Enum.Font.GothamBold; brontoHdr.LayoutOrder = 51
@@ -1956,6 +1962,7 @@ selAllBtn.MouseButton1Click:Connect(selectAllFiltered)
 osp:GetPropertyChangedSignal("Text"):Connect(rebuild)
 sb.MouseButton1Click:Connect(function() ov.Visible=true; rebuild() end)
 end
+do
 local sellAcc = UI:accordion(hScroll, "SELL SETTINGS", 2, true)
 local sellInner = sellAcc.Inner
 makeNumInput(sellInner, "Sell below (kg)", "sellThresh", 0, 3)
@@ -2073,8 +2080,10 @@ saveConfig(); refreshSellCount(); rebuildSellOverlay()
 end)
 soSearch:GetPropertyChangedSignal("Text"):Connect(rebuildSellOverlay)
 sellSelBtn.MouseButton1Click:Connect(function() sellOverlay.Visible = true; rebuildSellOverlay() end)
+end
 local boostAcc = UI:accordion(hScroll, "PET BOOST", 3, false)
 local boostInner = boostAcc.Inner
+do
 do
 local m1Row = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
 m1Row.LayoutOrder = 1; UI:corner(m1Row, 5); UI:stroke(m1Row, T.STROKE, 1)
@@ -2124,6 +2133,7 @@ end end
 end)
 end
 boBtn.MouseButton1Click:Connect(function() boOv.Visible = true end)
+end
 local spRow = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
 spRow.LayoutOrder = 3; UI:corner(spRow, 5); UI:stroke(spRow, T.STROKE, 1)
 local spCount = 0
@@ -3105,8 +3115,9 @@ end
 -- ============================================================
 -- MISC TAB
 -- ============================================================
+local miscScroll
 do
-local miscScroll = UI:scroll(PageMisc, UDim2.new(1,0,1,0))
+miscScroll = UI:scroll(PageMisc, UDim2.new(1,0,1,0))
 miscScroll.ScrollingDirection = Enum.ScrollingDirection.Y
 miscScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 miscScroll.ScrollBarThickness = 3
