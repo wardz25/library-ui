@@ -1278,7 +1278,7 @@ if isMobile then
 guiScale = math.clamp((viewport.X / 420) * 0.72, 0.65, 1.4)
 end
 local SpeedLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua"))()
-local speedTabs = SpeedLib:CreateWindow({"Velium Hub", "| Grow A Garden", 120, UDim2.fromOffset(guiW, guiH)})
+local speedTabs = SpeedLib:CreateWindow({"Velium Hub", "| Grow A Garden", 145, UDim2.fromOffset(guiW, guiH)})
 local ScreenGui = speedTabs._Gui
 local mainFrame = speedTabs._Main
 local confirmOv
