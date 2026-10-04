@@ -1285,7 +1285,13 @@ local confirmOv
 local modalRoot = UI:frame(ScreenGui, UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), T.BG, 1)
 modalRoot.Name = "VeliumModal"
 modalRoot.ZIndex = 200
-local TAB_ICONS = {HATCH = "", AUTOMATION = "", TEAMS = "", WEBHOOK = "", MISC = ""}
+local TAB_ICONS = {
+	HATCH = "🥚",
+	AUTOMATION = "🤖",
+	TEAMS = "🐾",
+	WEBHOOK = "📡",
+	MISC = "⚙️",
+}
 local tabHatch = speedTabs:CreateTab({"HATCH", TAB_ICONS.HATCH})
 local tabAuto = speedTabs:CreateTab({"AUTOMATION", TAB_ICONS.AUTOMATION})
 local tabTeams = speedTabs:CreateTab({"TEAMS", TAB_ICONS.TEAMS})
@@ -1301,8 +1307,8 @@ if c:FindFirstChildOfClass("UIStroke") then descLbl0 = c else titleLbl0 = c end
 end
 end
 local logoImg = Instance.new("ImageLabel")
-logoImg.Size = UDim2.new(0, 16, 0, 16)
-logoImg.Position = UDim2.new(0, 8, 0.5, -8)
+logoImg.Size = UDim2.new(0, 26, 0, 26)
+logoImg.Position = UDim2.new(0, 7, 0.5, -13)
 logoImg.BackgroundTransparency = 1
 logoImg.Image = "rbxassetid://118973578063038"
 logoImg.ScaleType = Enum.ScaleType.Fit
@@ -1310,12 +1316,13 @@ logoImg.Parent = topF
 task.defer(function()
 pcall(function()
 if titleLbl0 then
-titleLbl0.Position = UDim2.new(0, 30, 0, 0)
+local LOGO_W = 40
+titleLbl0.Position = UDim2.new(0, LOGO_W, 0, 0)
 local tw = titleLbl0.TextBounds.X
 titleLbl0.Size = UDim2.new(0, tw + 4, 1, 0)
 if descLbl0 then
-descLbl0.Position = UDim2.new(0, 30 + tw + 10, 0, 0)
-descLbl0.Size = UDim2.new(1, -(30 + tw + 10 + 70), 1, 0)
+descLbl0.Position = UDim2.new(0, LOGO_W + tw + 10, 0, 0)
+descLbl0.Size = UDim2.new(1, -(LOGO_W + tw + 10 + 70), 1, 0)
 end
 end
 end)
@@ -3017,7 +3024,8 @@ end
 -- TEAMS TAB
 -- ============================================================
 do
-local tmScroll = tabTeams:AddSection("PET TEAMS", true):GetContainer()
+local tmSection = tabTeams:AddSection("PET TEAMS", true)
+local tmScroll = tmSection:GetContainer()
 
 -- Title
 local title = UI:label(tmScroll, "Pet Teams", UDim2.new(1,0,0,18), nil, T.ACCENT, 13)
@@ -3037,7 +3045,7 @@ UI:stroke(saveBtn, T.ACCENT, 1)
 local saveMsg = UI:label(tmScroll, "", UDim2.new(1,0,0,14), nil, T.DIM, 10)
 saveMsg.Font = Enum.Font.Gotham; saveMsg.LayoutOrder = 2
 
--- â”€â”€ BUILT-IN TEAMS label + container (rendered ABOVE saved teams)
+-- ── BUILT-IN TEAMS label + container (rendered ABOVE saved teams)
 local builtinLbl = UI:label(tmScroll, "Built-In Teams", UDim2.new(1,0,0,16), nil, T.DIM, 11)
 builtinLbl.Font = Enum.Font.Gotham; builtinLbl.LayoutOrder = 3
 
@@ -3046,7 +3054,7 @@ builtinContainer.LayoutOrder = 4
 builtinContainer.AutomaticSize = Enum.AutomaticSize.Y
 UI:list(builtinContainer, 4)
 
--- â”€â”€ SAVED TEAMS label + container (rendered BELOW built-ins)
+-- ── SAVED TEAMS label + container (rendered BELOW built-ins)
 local savedLbl = UI:label(tmScroll, "Saved Teams", UDim2.new(1,0,0,16), nil, T.DIM, 11)
 savedLbl.Font = Enum.Font.Gotham; savedLbl.LayoutOrder = 5
 
@@ -3055,7 +3063,7 @@ teamsContainer.LayoutOrder = 6
 teamsContainer.AutomaticSize = Enum.AutomaticSize.Y
 UI:list(teamsContainer, 4)
 
--- â”€â”€ Inline card builders â€” pixel-matched to old Velium Hub design â”€â”€
+-- ── Inline card builders — pixel-matched to old Velium Hub design ──
 -- Layout per card:
 --   [32px logo, no background] [content: BUILT-IN pill + name bold + desc dim] [right: swap btn]
 -- Card height: 56px. Logo left-anchored at 10px. Content starts at 46px. Right btn at -36px.
@@ -3093,7 +3101,7 @@ local function makeBadge(card, x, y)
 	icon.Size = UDim2.new(0, 14, 1, 0)
 	icon.Position = UDim2.new(0, 2, 0, 0)
 	icon.BackgroundTransparency = 1
-	icon.Text = "âš¡"
+	icon.Text = "⚡"
 	icon.TextColor3 = Color3.fromRGB(128, 255, 234)
 	icon.Font = Enum.Font.GothamBold
 	icon.TextSize = 8
@@ -3112,13 +3120,13 @@ local function makeBadge(card, x, y)
 end
 
 local function makeSwapBtn(card, onEquip)
-	-- Purple swap button â€” right side, vertically centered
+	-- Purple swap button — right side, vertically centered
 	local btn = Instance.new("TextButton", card)
 	btn.Size = UDim2.new(0, 30, 0, 30)
 	btn.Position = UDim2.new(1, -36, 0.5, -15)
 	btn.BackgroundColor3 = Color3.fromRGB(24, 66, 60)
 	btn.BorderSizePixel = 0
-	btn.Text = "â‡„"
+	btn.Text = "⇄"
 	btn.TextColor3 = Color3.fromRGB(128, 255, 234)
 	btn.Font = Enum.Font.GothamBold
 	btn.TextSize = 14
@@ -3128,7 +3136,7 @@ local function makeSwapBtn(card, onEquip)
 end
 
 local function makeDeleteBtn(card, onDelete)
-	-- Red circle delete button â€” right side
+	-- Red circle delete button — right side
 	local btn = Instance.new("TextButton", card)
 	btn.Size = UDim2.new(0,28,0,28)
 	btn.Position = UDim2.new(1,-70,0.5,-14)
@@ -3167,10 +3175,10 @@ local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
 
 	makeVeliumIcon(card)
 
-	-- BUILT-IN badge â€” sits top of content column, x=52 to clear the new wider icon
+	-- BUILT-IN badge — sits top of content column, x=52 to clear the new wider icon
 	makeBadge(card, 62, 5)
 
-	-- Team name â€” below badge, bold
+	-- Team name — below badge, bold
 	local nameLbl = Instance.new("TextLabel", card)
 	nameLbl.Size = UDim2.new(1, -96, 0, 15)
 	nameLbl.Position = UDim2.new(0, 62, 0, 22)
@@ -3182,7 +3190,7 @@ local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
 	nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 	nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
-	-- Description â€” dim, small, below name
+	-- Description — dim, small, below name
 	local descLbl = Instance.new("TextLabel", card)
 	descLbl.Size = UDim2.new(1, -96, 0, 12)
 	descLbl.Position = UDim2.new(0, 62, 0, 39)
@@ -3208,7 +3216,7 @@ local function buildSavedCard(parent, teamName, petNamesStr, petCount, order, on
 
 	makeVeliumIcon(card)
 
-	-- Team name â€” bold, vertically offset so it sits upper-center of card
+	-- Team name — bold, vertically offset so it sits upper-center of card
 	local nameLbl = Instance.new("TextLabel", card)
 	nameLbl.Size = UDim2.new(1,-124,0,16)
 	nameLbl.Position = UDim2.new(0,62,0,14)
@@ -3220,7 +3228,7 @@ local function buildSavedCard(parent, teamName, petNamesStr, petCount, order, on
 	nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 	nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
-	-- Pet list â€” dim, small, below name
+	-- Pet list — dim, small, below name
 	local descLbl = Instance.new("TextLabel", card)
 	descLbl.Size = UDim2.new(1,-124,0,13)
 	descLbl.Position = UDim2.new(0,62,0,33)
@@ -3248,7 +3256,7 @@ local function rebuildTeams()
 		if not c:IsA("UIListLayout") and not c:IsA("UIPadding") then c:Destroy() end
 	end
 
-	-- â”€â”€ Render built-in teams (always in builtinContainer)
+	-- ── Render built-in teams (always in builtinContainer)
 	local builtins = (function() local s = _G._NH_BUILTIN_TEAMS; if type(s) ~= "table" then return builtInTeams end; for _, t in ipairs(s) do if type(t) ~= "table" or type(t.name) ~= "string" then return builtInTeams end end; return s end)()
 	for i, team in ipairs(builtins) do
 		local idx = i
@@ -3270,7 +3278,7 @@ local function rebuildTeams()
 		if not okCard then warn("[Velium Hub] builtin card " .. tostring(i) .. " failed: " .. tostring(cardErr)) end
 	end
 
-	-- â”€â”€ Render saved teams (always in teamsContainer)
+	-- ── Render saved teams (always in teamsContainer)
 	local teamNames = {}
 	for name in pairs(cfg.petTeams) do table.insert(teamNames, name) end
 	table.sort(teamNames)
@@ -3341,6 +3349,9 @@ local function rebuildTeams()
 		end)
 		if not okCard2 then warn("[Velium Hub] saved card " .. tostring(name) .. " failed: " .. tostring(cardErr2)) end
 	end
+
+	-- Force the PET TEAMS section to re-measure so cards aren't clipped
+	task.defer(function() pcall(function() tmSection:Resize() end) end)
 end
 
 saveBtn.MouseButton1Click:Connect(function()
@@ -3658,7 +3669,7 @@ print("[Velium Hub] INTERFACE accordion built.")
 do
 local whScroll = tabWebhook:AddSection("WEBHOOK", true):GetContainer()
 
--- Single accordion titled ðŸ”— WEBHOOK
+-- Single accordion titled 🔗 WEBHOOK
 local whInner = whScroll
 
 -- URL label
@@ -3680,11 +3691,11 @@ urlInp:GetPropertyChangedSignal("Text"):Connect(function() cfg.webhook.url = url
 local contRow = UI:frame(whInner, UDim2.new(1,0,0,28), nil, T.BTN)
 contRow.LayoutOrder = 3
 UI:corner(contRow, 5); UI:stroke(contRow, T.STROKE, 1)
-UI:label(contRow, "ðŸ”„ Continue Session (after rejoin)", UDim2.new(1,-52,1,0), UDim2.new(0,10,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
+UI:label(contRow, "🔄 Continue Session (after rejoin)", UDim2.new(1,-52,1,0), UDim2.new(0,10,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
 UI:toggle(contRow, UDim2.new(1,-48,0.5,-11), cfg.webhook.continueSession,
 	function(val) cfg.webhook.continueSession = val; saveConfig() end)
 -- Reset Session Data button
-local resetBtn = UI:button(whInner, "ðŸ”„ Reset Session Data", UDim2.new(1,0,0,30), nil, T.BTN, T.ERROR, 10)
+local resetBtn = UI:button(whInner, "🔄 Reset Session Data", UDim2.new(1,0,0,30), nil, T.BTN, T.ERROR, 10)
 resetBtn.Font = Enum.Font.GothamBold
 UI:stroke(resetBtn, T.ERROR, 1)
 resetBtn.LayoutOrder = 4
@@ -3695,16 +3706,16 @@ resetBtn.MouseButton1Click:Connect(function()
 	cfg.webhook.lastPet = nil
 	cfg.webhook.lastSync = nil
 	saveConfig()
-	resetBtn.Text = "âœ… Session Data Reset!"
+	resetBtn.Text = "✅ Session Data Reset!"
 	resetBtn.TextColor3 = T.SUCCESS
 	task.delay(2, function()
-		resetBtn.Text = "ðŸ”„ Reset Session Data"
+		resetBtn.Text = "🔄 Reset Session Data"
 		resetBtn.TextColor3 = T.ERROR
 	end)
 end)
 
 -- Send Test button
-local testBtn = UI:button(whInner, "ðŸ“¡ Send Test", UDim2.new(1,0,0,30), nil, Color3.fromRGB(20,15,50), T.ACCENT, 10)
+local testBtn = UI:button(whInner, "📡 Send Test", UDim2.new(1,0,0,30), nil, Color3.fromRGB(20,15,50), T.ACCENT, 10)
 testBtn.Font = Enum.Font.GothamBold
 UI:stroke(testBtn, T.ACCENT, 1)
 UI:corner(testBtn, 6)
@@ -3712,7 +3723,7 @@ testBtn.LayoutOrder = 9
 testBtn.MouseButton1Click:Connect(function()
 	testBtn.Text = "Sending..."
 	sendTestWebhook()
-	task.delay(2, function() testBtn.Text = "ðŸ“¡ Send Test" end)
+	task.delay(2, function() testBtn.Text = "📡 Send Test" end)
 end)
 end
 

@@ -281,11 +281,7 @@ function Speed_Library:SetNotification(Config)
     Parent = Top
   })
 
-  Custom:Create("UIStroke", {
-    Color = Color3.fromRGB(255, 255, 255),
-    Thickness = 0.3,
-    Parent = TextLabel
-  })
+  -- (sub-pixel UIStroke removed: it made the title text look fuzzy)
 
   Custom:Create("UICorner", {
     Parent = Top,
@@ -307,11 +303,7 @@ function Speed_Library:SetNotification(Config)
     Parent = Top
   })
 
-  Custom:Create("UIStroke", {
-    Color = Custom.ColorRGB,
-    Thickness = 0.4,
-    Parent = TextLabel1
-  })
+  -- (sub-pixel UIStroke removed: it made the description text look fuzzy)
 
   local Close = Custom:Create("TextButton", {
     Font = Enum.Font.SourceSans,
@@ -476,10 +468,7 @@ function Speed_Library:CreateWindow(Config)
     Position = UDim2.new(0, TextLabel.TextBounds.X + 15, 0, 0)
   }, Top)
 
-  Custom:Create("UIStroke", {
-    Color = Custom.ColorRGB,
-    Thickness = 0.4
-  }, TextLabel1)
+  -- (sub-pixel UIStroke removed: it made the game-name label look fuzzy)
 
   local Close = Custom:Create("TextButton", {
     Font = Enum.Font.SourceSans,
@@ -839,16 +828,32 @@ function Speed_Library:CreateWindow(Config)
       Name = "TabName",
     }, Tab)
 
-    Custom:Create("ImageLabel", {
-      Image = Icon,
-      BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-      BackgroundTransparency = 0.999,
-      BorderColor3 = Color3.fromRGB(0, 0, 0),
-      BorderSizePixel = 0,
-      Position = UDim2.new(0, 9, 0, 7),
-      Size = UDim2.new(0, 16, 0, 16),
-      Name = "FeatureImg",
-    }, Tab)
+    if Icon ~= "" and not string.find(Icon, "rbxassetid") and not string.find(Icon, "http") then
+      Custom:Create("TextLabel", {
+        Font = Enum.Font.GothamBold,
+        Text = Icon,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 15,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 7, 0, 6),
+        Size = UDim2.new(0, 18, 0, 18),
+        Name = "FeatureImg",
+      }, Tab)
+    else
+      Custom:Create("ImageLabel", {
+        Image = Icon,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 0.999,
+        BorderColor3 = Color3.fromRGB(0, 0, 0),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 9, 0, 7),
+        Size = UDim2.new(0, 16, 0, 16),
+        Name = "FeatureImg",
+      }, Tab)
+    end
 
     if CountTab == 0 then
       LayersPageLayout:JumpToIndex(0)
@@ -1042,33 +1047,46 @@ function Speed_Library:CreateWindow(Config)
   
       local function UpdateSizeScroll()
         local OffsetY = 0
-  
+
         for _, child in pairs(ScrolLayers:GetChildren()) do
           if child.Name ~= "UIListLayout" then
-            OffsetY = OffsetY + 3 + child.Size.Y.Offset
+            local _h = child.Size.Y.Offset
+            local _abs = child.AbsoluteSize.Y
+            if _abs > _h then _h = _abs end
+            OffsetY = OffsetY + 3 + _h
           end
         end
-        
+
         ScrolLayers.CanvasSize = UDim2.new(0, 0, 0, OffsetY)
       end
     
       local function UpdateSizeSection()
         if OpenSection then
           local SectionSizeYWitdh = 38
-  
-          for _, v in pairs(SectionAdd:GetChildren()) do
-            if v.Name ~= "UIListLayout" and v.Name ~= "UICorner" then
-              SectionSizeYWitdh = SectionSizeYWitdh + v.Size.Y.Offset + 3
+
+          -- Preferred: ask the layout engine for the real content height.
+          -- This is correct even when children use AutomaticSize (offset == 0),
+          -- which is what made PET TEAMS look clipped.
+          local contentH = SectionAdd.AbsoluteContentSize.Y
+          if contentH > 0 then
+            SectionSizeYWitdh = 38 + contentH + 3
+          else
+            for _, v in pairs(SectionAdd:GetChildren()) do
+              if v.Name ~= "UIListLayout" and v.Name ~= "UICorner" then
+                local _ch = v.AbsoluteSize.Y
+                if _ch <= 0 then _ch = v.Size.Y.Offset end
+                SectionSizeYWitdh = SectionSizeYWitdh + _ch + 3
+              end
             end
           end
-    
+
           TweenService:Create(FeatureFrame, TweenInfo.new(0.1), {Rotation = 90}):Play()
           TweenService:Create(Section, TweenInfo.new(0.1), {Size = UDim2.new(1, 1, 0, SectionSizeYWitdh)}):Play()
           TweenService:Create(SectionAdd, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 0, SectionSizeYWitdh - 38)}):Play()
           TweenService:Create(SectionDecideFrame, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 0, 2)}):Play()
-            
-          task.wait(0.5)
-          UpdateSizeScroll()
+
+          -- wait for the 0.1s size tween to land before measuring the scroll canvas
+          task.delay(0.15, UpdateSizeScroll)
         end
       end
     
@@ -1092,12 +1110,19 @@ function Speed_Library:CreateWindow(Config)
       SectionButton.Activated:Connect(ToggleSection)
       SectionAdd.ChildAdded:Connect(UpdateSizeSection)
       SectionAdd.ChildRemoved:Connect(UpdateSizeSection)
+      SectionAdd.DescendantAdded:Connect(function()
+        if OpenSection then task.delay(0.25, UpdateSizeSection) end
+      end)
     
       UpdateSizeScroll()
 
       local Item, ItemCount = {}, 0
       function Item:GetContainer() -- Velium: free-form parenting for external modules
         return SectionAdd
+      end
+      function Item:Resize() -- Velium: force a re-measure of this section's height
+        UpdateSizeSection()
+        UpdateSizeScroll()
       end
       function Item:AddParagraph(Config)
         local Title = Config[1] or Config.Title or ""
