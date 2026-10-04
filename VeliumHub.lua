@@ -1278,7 +1278,7 @@ if isMobile then
 guiScale = math.clamp((viewport.X / 420) * 0.72, 0.65, 1.4)
 end
 local SpeedLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua"))()
-local speedTabs = SpeedLib:CreateWindow({"Velium Hub", "Build " .. VELIUM_BUILD, 120, UDim2.fromOffset(guiW, guiH)})
+local speedTabs = SpeedLib:CreateWindow({"Velium Hub", "| Grow A Garden", 120, UDim2.fromOffset(guiW, guiH)})
 local ScreenGui = speedTabs._Gui
 local mainFrame = speedTabs._Main
 local confirmOv
@@ -1290,6 +1290,45 @@ local tabAuto = speedTabs:CreateTab({"AUTOMATION", ""})
 local tabTeams = speedTabs:CreateTab({"TEAMS", ""})
 local tabWebhook = speedTabs:CreateTab({"WEBHOOK", ""})
 local tabMisc = speedTabs:CreateTab({"MISC", ""})
+do
+local topF = mainFrame:FindFirstChild("Top")
+if topF then
+for _, c in ipairs(topF:GetChildren()) do
+if c:IsA("TextLabel") and c.Position.X.Offset == 10 and c.Size.X.Scale == 1 then
+c.Position = UDim2.new(0, 30, 0, 0)
+break
+end
+end
+local logoImg = Instance.new("ImageLabel")
+logoImg.Size = UDim2.new(0, 16, 0, 16)
+logoImg.Position = UDim2.new(0, 8, 0.5, -8)
+logoImg.BackgroundTransparency = 1
+logoImg.Image = "rbxassetid://118973578063038"
+logoImg.ScaleType = Enum.ScaleType.Fit
+logoImg.Parent = topF
+end
+local layersTab = mainFrame:FindFirstChild("LayersTab")
+local scrollTab = layersTab and layersTab:FindFirstChild("ScrollTab")
+if layersTab and scrollTab then
+scrollTab.Size = UDim2.new(1, 0, 1, -66)
+local prof = UI:frame(layersTab, UDim2.new(1, -8, 0, 48), UDim2.new(0, 4, 1, -52), T.PANEL)
+UI:corner(prof, 8); UI:stroke(prof, T.STROKE, 1)
+local av = Instance.new("ImageLabel", prof)
+av.Size = UDim2.new(0, 32, 0, 32)
+av.Position = UDim2.new(0, 8, 0.5, -16)
+av.BackgroundTransparency = 1
+av.Image = "rbxassetid://118973578063038"
+av.ScaleType = Enum.ScaleType.Fit
+UI:corner(av, 16)
+pcall(function()
+local thumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+if thumb and thumb ~= "" then av.Image = thumb end
+end)
+local nm = UI:label(prof, LocalPlayer.Name, UDim2.new(1, -48, 1, 0), UDim2.new(0, 44, 0, 0), T.TEXT, 11)
+nm.Font = Enum.Font.GothamBold
+nm.TextTruncate = Enum.TextTruncate.AtEnd
+end
+end
 local PageHatch = modalRoot
 SpeedLib.OnCloseRequest = function() confirmOv.Visible = true end
 -- TOAST NOTIFICATIONS (bottom-right corner, outside main UI)
