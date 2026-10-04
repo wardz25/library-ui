@@ -3147,6 +3147,7 @@ local function makeDeleteBtn(card, onDelete)
 end
 
 local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
+	print("[Velium Hub] DBG card#" .. tostring(order) .. " name=" .. tostring(teamName) .. " parentW=" .. tostring(parent.AbsoluteSize.X))
 	local singleDesc = tostring(teamDesc or ""):gsub("\n", " | ")
 	local card = Instance.new("Frame", parent)
 	card.Size = UDim2.new(1, 0, 0, 58)
