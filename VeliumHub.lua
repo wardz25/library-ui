@@ -2994,6 +2994,7 @@ _G.HH_Shared = {
 	SellAllRemote = SellPetRE, DataService = DataService,
 	outerScroll = nil,      -- assigned after AUTOMATION tab exists
 	PageLeveling = nil,     -- assigned after AUTOMATION tab exists
+	modalRoot = modalRoot,  -- fullscreen modal layer for module overlays
 	_buildTeamDD = buildTeamDD, getTeamUUIDs = getTeamUUIDs,
 }
 end
@@ -4839,10 +4840,10 @@ end
 
 -- Point outerScroll to the Leveling container so it injects at LayoutOrder 1
 _G.HH_Shared.outerScroll = levelBox
-local gotL = loadExternalModule("Leveling",  "https://velium-hub.vercel.app/api/modules/gag/load?name=leveling&type=module")
+local gotL = loadExternalModule("Leveling", "https://raw.githubusercontent.com/wardz25/library-ui/main/modules/leveling.lua")
 -- Point outerScroll to the Nightmare container so it injects at LayoutOrder 2
 _G.HH_Shared.outerScroll = nightmareBox
-local gotN = loadExternalModule("Nightmare", "https://velium-hub.vercel.app/api/modules/gag/load?name=nightmare&type=module")
+local gotN = loadExternalModule("Nightmare", "https://raw.githubusercontent.com/wardz25/library-ui/main/modules/nightmare.lua")
 -- Restore outerScroll to aScroll for any other use
 _G.HH_Shared.outerScroll = levelBox
 if not (gotL and gotN) then
