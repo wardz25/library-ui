@@ -221,7 +221,6 @@ autoBuy = {
 seed = {on=false, items={}},
 egg = {on=false, items={}},
 gear = {on=false, items={}},
-nightEgg = {on=false},
 },
 autoHatch = {
 eggName = "Paradise Egg",
@@ -291,7 +290,7 @@ if cfg.webhook.sendCycle == nil then cfg.webhook.sendCycle = true end
 if cfg.webhook.sendFinished == nil then cfg.webhook.sendFinished = true end
 if cfg.webhook.sendSpecial == nil then cfg.webhook.sendSpecial = true end
 if cfg.webhook.sendHatch == nil then cfg.webhook.sendHatch = true end
-if not cfg.autoBuy then cfg.autoBuy = {seed={on=false,items={}},egg={on=false,items={}},gear={on=false,items={}},nightEgg={on=false}} end
+if not cfg.autoBuy then cfg.autoBuy = {seed={on=false,items={}},egg={on=false,items={}},gear={on=false,items={}}} end
 if data.autoBuy then for k, v in pairs(data.autoBuy) do if type(v) == "table" then if not cfg.autoBuy[k] then cfg.autoBuy[k] = {} end for kk, vv in pairs(v) do cfg.autoBuy[k][kk] = vv end else cfg.autoBuy[k] = v end end end
 if data.leveling then for k, v in pairs(data.leveling) do cfg.leveling[k] = v end end
 if data.autoHatch then for k, v in pairs(data.autoHatch) do cfg.autoHatch[k] = v end end
@@ -554,17 +553,6 @@ pcall(function() re:FireServer(itemName) end)
 task.wait(0.1)
 end
 end
-BuySys.nightTick = function()
-local st = cfg.autoBuy and cfg.autoBuy.nightEgg
-if not (st and st.on) then return end
-local ge = RS:FindFirstChild("GameEvents")
-local re = ge and ge:FindFirstChild("BuyEventShopStock")
-if not re then return end
-for _, shop in ipairs({"Blood Moon Shop", "Twilight Shop"}) do
-pcall(function() re:FireServer("Night Egg", shop) end)
-task.wait(0.1)
-end
-end
 for _, kind in ipairs({"seed", "egg", "gear"}) do
 task.spawn(function()
 while true do
@@ -573,12 +561,6 @@ pcall(function() BuySys.fireBuyKind(kind) end)
 end
 end)
 end
-task.spawn(function()
-while true do
-task.wait(10)
-pcall(BuySys.nightTick)
-end
-end)
 local progressHistory = {}
 local function sendCycleWebhook(petName, fromKG, toKG, targetKG, cycleTime, phase, queuePos, queueTotal, petId)
 if cfg.webhook.sendCycle == false then return end
@@ -3767,13 +3749,6 @@ local dk2, tt2 = spec.dk, "Select " .. spec.pick
 sbtn.MouseButton1Click:Connect(function() openBuyPicker(kk, tt2, dk2) end)
 end
 refreshBuyLbl()
-local nrow = UI:frame(buyInner, UDim2.new(1,0,0,26), nil, T.BTN)
-nrow.LayoutOrder = 7
-UI:corner(nrow, 5); UI:stroke(nrow, T.STROKE, 1)
-UI:label(nrow, "Auto Buy Night Egg", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-if not cfg.autoBuy.nightEgg then cfg.autoBuy.nightEgg = {on=false} end
-UI:toggle(nrow, UDim2.new(1,-48,0.5,-11), cfg.autoBuy.nightEgg.on,
-function(val) cfg.autoBuy.nightEgg.on = val; saveConfig() end)
 end
 print("[Velium Hub] Building INTERFACE accordion...")
 local ifAcc = UI:accordion(miscScroll, "INTERFACE", 5, true)
