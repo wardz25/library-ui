@@ -1012,7 +1012,7 @@ if isBuiltin then
 local icon = Instance.new("ImageLabel", btn)
 icon.Size = UDim2.new(0,16,0,16); icon.Position = UDim2.new(1,-20,0.5,-8)
 icon.BackgroundTransparency = 1
-icon.Image = "rbxassetid://110539193777851"
+icon.Image = "rbxassetid://118973578063038"
 icon.ScaleType = Enum.ScaleType.Fit; icon.ZIndex = btn.ZIndex + 1
 end
 btn.MouseButton1Click:Connect(function() onSelect(name) end)
@@ -1254,7 +1254,7 @@ tStroke.Transparency = 1
 local tLogo = Instance.new("ImageLabel", toast)
 tLogo.Size = UDim2.new(0, 20, 0, 20); tLogo.Position = UDim2.new(0, 8, 0, 6)
 tLogo.BackgroundTransparency = 1
-tLogo.Image = "rbxassetid://110539193777851"
+tLogo.Image = "rbxassetid://118973578063038"
 tLogo.ScaleType = Enum.ScaleType.Fit
 tLogo.ImageTransparency = 1
 local tVelium = UI:label(toast, "Velium", UDim2.new(0, 0, 0, 20), UDim2.new(0, 32, 0, 6), T.TEXT, 11)
@@ -1417,7 +1417,7 @@ UI:corner(topBar, 8)
 local logo = Instance.new("ImageLabel", topBar)
 logo.Size = UDim2.new(0,16,0,16); logo.Position = UDim2.new(0,6,0.5,-8)
 logo.BackgroundTransparency = 1
-logo.Image = "rbxassetid://110539193777851"
+logo.Image = "rbxassetid://118973578063038"
 logo.ScaleType = Enum.ScaleType.Fit
 UI:label(topBar, "|", UDim2.new(0,8,1,0), UDim2.new(0,24,0,0), T.DIM, 13, Enum.TextXAlignment.Center)
 local titleRow = UI:frame(topBar, UDim2.new(1, -100, 1, 0), UDim2.new(0, 34, 0, 0), T.PANEL, 1)
@@ -1479,7 +1479,7 @@ local restoreImg = Instance.new("ImageLabel", restoreBtn)
 restoreImg.Size = UDim2.new(0,36,0,36)
 restoreImg.Position = UDim2.new(0.5,-18,0.5,-18)
 restoreImg.BackgroundTransparency = 1
-restoreImg.Image = "rbxassetid://110539193777851"
+restoreImg.Image = "rbxassetid://118973578063038"
 restoreImg.ScaleType = Enum.ScaleType.Fit
 restoreImg.ImageColor3 = Color3.fromRGB(250, 222, 2)
 restoreImg.ZIndex = 51
@@ -2777,7 +2777,7 @@ UI:list(teamsContainer, 4)
 --   [32px circle icon: Velium logo on red bg] [content: BUILT-IN pill + name bold + desc dim] [right: swap btn]
 -- Card height: 56px. Icon left-anchored at 6px. Content starts at 46px. Right btn at -36px.
 
-local VELIUM_ICON = "rbxassetid://110539193777851"
+local VELIUM_ICON = "rbxassetid://118973578063038"
 local CARD_BG    = Color3.fromRGB(24, 24, 31)
 local ICON_BG    = Color3.fromRGB(58, 45, 10)
 
