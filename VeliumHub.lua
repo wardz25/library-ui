@@ -2552,6 +2552,7 @@ task.wait(0.15)
 local target = cfg.placeEggs.maxEggs or 20
 local placed = 0
 local stuck = 0
+local useGarden = false
 for attempt = 1, count * 8 + 30 do
 if HatchTrack.hatchRunning == false then return placed end
 if placed >= count then break end
@@ -2559,7 +2560,8 @@ local before = countEggPlaced()
 if before >= target then plog("Egg target reached (" .. before .. "/" .. target .. ")", T.DIM); break end
 if maxEggReached() then plog("Max egg notice on screen, stopping place", T.ERROR); break end
 holdHatchEggTool(eggName)
-local pos = getEggPlacePos()
+local pos = nil
+if not useGarden then pos = getEggPlacePos() end
 if not pos then
 local px = area.minX + math.random() * (area.maxX - area.minX)
 local pz = area.minZ + math.random() * (area.maxZ - area.minZ)
@@ -2571,6 +2573,7 @@ task.wait(0.12)
 local after = countEggPlaced()
 if after <= before then
 stuck = stuck + 1
+if stuck == 6 and not useGarden then useGarden = true; plog("Plot positions rejected, switching to garden random", T.ERROR) end
 if stuck >= 20 then plog("Place stuck (server not spawning eggs)", T.ERROR); break end
 task.wait(0.1)
 else
@@ -2835,6 +2838,7 @@ task.wait(2)
 if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "wait"
 local timeout = os.clock() + 120
+local zeroHits = 0
 while os.clock() < timeout do
 local eggCount = 0
 local allReady = true
@@ -2846,8 +2850,18 @@ end
 end
 if eggCount > 0 and allReady then break end
 if eggCount == 0 and placed > 0 then
-logFn("No eggs detected, retrying hatch...", T.DIM)
-hatchAllEggs()
+zeroHits = zeroHits + 1
+if zeroHits == 3 or zeroHits == 6 then
+logFn("No eggs detected, re-placing (try " .. zeroHits .. ")...", T.ERROR)
+placed = placed + placeEggs(a.eggName, a.eggCount, a.eggSpacing, logFn)
+elseif zeroHits >= 10 then
+logFn("Eggs still not detected, skipping hatch", T.ERROR)
+break
+elseif zeroHits % 3 == 1 then
+logFn("No eggs detected, waiting...", T.DIM)
+end
+else
+zeroHits = 0
 end
 if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 task.wait(1)
