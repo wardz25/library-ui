@@ -687,9 +687,10 @@ function VoidUI:builtinTeamCard(parent, name, desc, lo, onEquip)
 	veliumLogo.Size = UDim2.new(0, 32, 0, 32)
 	veliumLogo.Position = UDim2.new(1, -68, 0.5, -16)
 	veliumLogo.BackgroundTransparency = 1
-	veliumLogo.Image = "rbxthumb://type=Asset&id=110539193777851&w=150&h=150"
+	veliumLogo.Image = "rbxassetid://118973578063038"
 	veliumLogo.ScaleType = Enum.ScaleType.Fit
-	veliumLogo.ImageTransparency = 0.2
+	veliumLogo.ImageTransparency = 0
+	veliumLogo.ImageColor3 = Color3.fromRGB(255, 255, 255)
 
 	
 	local equipBtn = self:button(card, "⇄", UDim2.new(0, 28, 0, 28), UDim2.new(1, -36, 0.5, -14), Color3.fromRGB(58, 45, 10), Color3.fromRGB(247, 177, 2), 12)
