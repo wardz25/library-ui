@@ -3367,14 +3367,7 @@ end
 -- ============================================================
 -- MISC TAB
 -- ============================================================
-local miscScroll
 do
-miscScroll.ScrollingDirection = Enum.ScrollingDirection.Y
-miscScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-miscScroll.ScrollBarThickness = 3
-miscScroll.ScrollBarImageColor3 = T.ACCENT
-UI:list(miscScroll, 5)
-UI:pad(miscScroll, 4,4,4,4)
 local inner = tabMisc:AddSection("VISIBILITY", true):GetContainer()
 local visConnections = {}
 local function hidePart(obj)
