@@ -3096,54 +3096,23 @@ UI:list(teamsContainer, 4)
 
 -- ── Inline card builders — pixel-matched to old Velium Hub design ──
 -- Layout per card:
---   [32px circle icon: Velium logo on red bg] [content: BUILT-IN pill + name bold + desc dim] [right: swap btn]
--- Card height: 56px. Icon left-anchored at 6px. Content starts at 46px. Right btn at -36px.
+--   [32px logo, no background] [content: BUILT-IN pill + name bold + desc dim] [right: swap btn]
+-- Card height: 56px. Logo left-anchored at 10px. Content starts at 46px. Right btn at -36px.
 
 local VELIUM_ICON = "rbxassetid://118973578063038"
 local CARD_BG    = Color3.fromRGB(24, 24, 31)
-local ICON_BG    = Color3.fromRGB(58, 45, 10)
 
 local function makeVeliumIcon(card)
-	-- Outer glow ring
-	local glowRing = Instance.new("Frame", card)
-	glowRing.Size = UDim2.new(0, 42, 0, 42)
-	glowRing.Position = UDim2.new(0, 10, 0.5, -21)
-	glowRing.BackgroundColor3 = Color3.fromRGB(199, 120, 2)
-	glowRing.BackgroundTransparency = 0.7
-	glowRing.BorderSizePixel = 0
-	local gr = Instance.new("UICorner", glowRing); gr.CornerRadius = UDim.new(1, 0)
-
-	-- Mid ring (border accent)
-	local midRing = Instance.new("Frame", card)
-	midRing.Size = UDim2.new(0, 36, 0, 36)
-	midRing.Position = UDim2.new(0, 13, 0.5, -18)
-	midRing.BackgroundColor3 = Color3.fromRGB(180, 108, 2)
-	midRing.BackgroundTransparency = 0.3
-	midRing.BorderSizePixel = 0
-	local mr = Instance.new("UICorner", midRing); mr.CornerRadius = UDim.new(1, 0)
-
-	-- Main icon background circle
-	local iconBg = Instance.new("Frame", card)
-	iconBg.Size = UDim2.new(0, 30, 0, 30)
-	iconBg.Position = UDim2.new(0, 16, 0.5, -15)
-	iconBg.BackgroundColor3 = Color3.fromRGB(100, 62, 0)
-	iconBg.BorderSizePixel = 0
-	local c = Instance.new("UICorner", iconBg); c.CornerRadius = UDim.new(1, 0)
-
-	-- Inner stroke ring
-	local stroke = Instance.new("UIStroke", iconBg)
-	stroke.Color = Color3.fromRGB(247, 177, 2)
-	stroke.Thickness = 1.5
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-	-- Velium logo image
-	local img = Instance.new("ImageLabel", iconBg)
-	img.Size = UDim2.new(0, 22, 0, 22)
-	img.Position = UDim2.new(0.5, -11, 0.5, -11)
+	-- Logo only: plain image, no circle, no rings, no tint
+	local img = Instance.new("ImageLabel", card)
+	img.Size = UDim2.new(0, 32, 0, 32)
+	img.Position = UDim2.new(0, 10, 0.5, -16)
 	img.BackgroundTransparency = 1
+	img.BorderSizePixel = 0
 	img.Image = VELIUM_ICON
 	img.ScaleType = Enum.ScaleType.Fit
-	img.ImageColor3 = Color3.fromRGB(250, 222, 2)
+	img.ImageTransparency = 0
+	img.ImageColor3 = Color3.fromRGB(255, 255, 255)
 end
 
 local function makeBadge(card, x, y)
