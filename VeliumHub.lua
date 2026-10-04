@@ -1836,6 +1836,7 @@ local function onHatchToggle(val)
 if val then
 if hatchRunning then return end
 hatchRunning = true
+HatchTrack.hatchRunning = true
 VeliumNotify("Auto Hatch", true)
 statusLbl.Text = "RUNNING"
 statusLbl.TextColor3 = T.SUCCESS
@@ -1861,6 +1862,7 @@ hatchRunning = false
 end)
 else
 hatchRunning = false
+HatchTrack.hatchRunning = false
 VeliumNotify("Auto Hatch", false)
 statusLbl.Text = "STOPPED"
 statusLbl.TextColor3 = T.ERROR
@@ -2432,6 +2434,7 @@ return hit
 end
 local function placeEggs(eggName, count, spacing)
 if not PetEggService then return 0 end
+if HatchTrack.hatchRunning == false then return 0 end
 local char = LocalPlayer.Character or Character
 local hrp = char and char:FindFirstChild("HumanoidRootPart")
 if not hrp then return 0 end
@@ -2444,6 +2447,7 @@ local target = cfg.placeEggs.maxEggs or 20
 local placed = 0
 local stuck = 0
 for attempt = 1, count * 8 + 30 do
+if HatchTrack.hatchRunning == false then return placed end
 if placed >= count then break end
 local before = countEggPlaced()
 if before >= target then break end
@@ -2482,6 +2486,7 @@ return n
 end
 local function hatchAllEggs()
 if not PetEggService then return 0 end
+if HatchTrack.hatchRunning == false then return 0 end
 local eggBefore = totalEggNow()
 local ready = {}
 pcall(function()
@@ -2573,6 +2578,7 @@ end
 local sold = 0
 local inv = getInventory()
 for uuid, pet in pairs(inv) do
+if HatchTrack.hatchRunning == false then break end
 local petName = pet.PetType or ""
 if sellList[petName] then
 local kg = (pet.PetData and pet.PetData.BaseWeight) or 0
@@ -2605,6 +2611,7 @@ local totalFav = 0
 local pass = 0
 while true do
 pass = pass + 1
+if HatchTrack.hatchRunning == false then break end
 local unfaved = {}
 for _, tool in ipairs(Backpack:GetChildren()) do
 if tool:IsA("Tool") and (tool:FindFirstChild("PetToolLocal") or tool:FindFirstChild("PetToolServer")) then
@@ -2619,6 +2626,7 @@ break
 end
 print("[favAllPets] Pass "..pass..": "..#unfaved.." unfaved remaining")
 for _, pet in ipairs(unfaved) do
+if HatchTrack.hatchRunning == false then break end
 hum:EquipTool(pet)
 pcall(function() FavItemRemote:FireServer(pet) end)
 hum:UnequipTools()
@@ -2641,6 +2649,7 @@ table.insert(allTools, tool)
 end
 end
 for _, tool in ipairs(allTools) do
+if HatchTrack.hatchRunning == false then break end
 if tool.Parent ~= Character then
 tool.Parent = Character
 task.wait(0.05)
@@ -2666,6 +2675,7 @@ end
 end
 runHatchCycle = function(statusFn, logFn)
 local a = cfg.autoHatch
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "sell"
 local hasSellPets = a.sellPets and next(a.sellPets)
 local sellAllMode = a.sellAll == true
@@ -2694,6 +2704,7 @@ logFn("Selling selected pets one by one...", T.ACCENT)
 sellSelectedOneByOne(logFn)
 end
 end
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "cd"
 if a.teamCD then logFn("Equipping CD team...", T.DIM); wearTeam(a.teamCD) end
 local existingEggs = 0
@@ -2707,12 +2718,14 @@ if existingEggs > 0 then
 logFn(string.format("Found %d existing eggs, skipping place", existingEggs), T.DIM)
 else
 logFn("Placing eggs...", T.ACCENT)
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "place"
 placed = placeEggs(a.eggName, a.eggCount, a.eggSpacing)
 if placed == 0 then logFn("No eggs to place!", T.ERROR); return end
 logFn(string.format("Placed %d eggs, waiting for hatch...", placed), T.ACCENT)
 end
 task.wait(2)
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "wait"
 local timeout = os.clock() + 120
 while os.clock() < timeout do
@@ -2729,8 +2742,10 @@ if eggCount == 0 and placed > 0 then
 logFn("No eggs detected, retrying hatch...", T.DIM)
 hatchAllEggs()
 end
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 task.wait(1)
 end
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "koi"
 if a.teamKoi then
 logFn("Equipping Koi team...", T.ACCENT)
@@ -2741,6 +2756,7 @@ local beforeHatch = {}
 pcall(function() for uuid in pairs(getInventory()) do beforeHatch[uuid] = true end end)
 hatchAllEggs()
 task.wait(1)
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "fire"
 local hatchedNow = {}
 pcall(function()
@@ -2781,9 +2797,11 @@ teamLines[label] = table.concat(parts, ", ")
 end
 end
 end
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "webhook"
 pcall(function() sendHatchWebhook(a.eggName, hatchedNow, teamLines) end)
 end
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "special"
 if a.specialBronto and a.specialBronto.enabled then
 local brontoThresh = a.brontoThresh or 4
@@ -2793,6 +2811,7 @@ pcall(function() activePets = getActivePets() end)
 local inv = getInventory()
 local kept = 0
 for _, uuid in ipairs(activePets) do
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 local pet = inv[uuid]
 if pet then
 local kg = (pet.PetData and pet.PetData.BaseWeight) or 0
@@ -2818,10 +2837,12 @@ if kept > 0 then
 logFn(string.format("Kept %d pets for Bronto (heavy >= %.1fg or special)", kept, brontoThresh), T.ACCENT)
 end
 end
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "fav"
 if a.favDelay and a.favDelay > 0 then
 favAllPets(a.favDelay)
 end
+if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "autosell"
 if a.sellEnabled ~= false and a.autoSellWhenFull then
 local inv = getInventory()
