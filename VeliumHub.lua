@@ -1824,7 +1824,6 @@ end
 addLog("Auto Hatch ready!", T.SUCCESS)
 local hatchRunning = false
 local hatchThread = nil
-local runHatchCycle
 local statusRow = UI:frame(hatchInner, UDim2.new(1,0,0,30), nil, T.DARK_CARD)
 statusRow.LayoutOrder = 50
 UI:corner(statusRow, 5); UI:stroke(statusRow, T.STROKE, 1)
