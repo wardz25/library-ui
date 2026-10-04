@@ -2809,33 +2809,43 @@ end
 local function favAllPets()
 local hum = Character and Character:FindFirstChildOfClass("Humanoid")
 if not hum then return end
+pcall(function() hum:UnequipTools() end)
+task.wait(0.2)
+local function isFaved(tool) return tool:GetAttribute(FAV_KEY) == true end
 local totalFav = 0
 local pass = 0
 while true do
 pass = pass + 1
 if HatchTrack.hatchRunning == false then break end
+if pass > 30 then print("[Velium Hub] favAllPets: pass cap reached, stopping"); break end
 local unfaved = {}
 for _, tool in ipairs(Backpack:GetChildren()) do
 if tool:IsA("Tool") and (tool:FindFirstChild("PetToolLocal") or tool:FindFirstChild("PetToolServer")) then
-if tool:GetAttribute(FAV_KEY) ~= true then
+if not isFaved(tool) then
 table.insert(unfaved, tool)
 end
 end
 end
 if #unfaved == 0 then
-print("[favAllPets] All pets favorited! Total: ", totalFav, "Passes: ", pass)
 break
 end
-print("[favAllPets] Pass "..pass..": "..#unfaved.." unfaved remaining")
 for _, pet in ipairs(unfaved) do
 if HatchTrack.hatchRunning == false then break end
-hum:EquipTool(pet)
 pcall(function() FavItemRemote:FireServer(pet) end)
+task.wait(0.15)
+if not isFaved(pet) then
+hum:EquipTool(pet)
+task.wait(0.15)
+pcall(function() FavItemRemote:FireServer(pet) end)
+task.wait(0.15)
 hum:UnequipTools()
+task.wait(0.15)
 end
-totalFav = totalFav + #unfaved
-task.wait(0.1)
+if isFaved(pet) then totalFav = totalFav + 1 end
 end
+task.wait(0.3)
+end
+pcall(function() hum:UnequipTools() end)
 end
 local function unfavSellPets(delay)
 local sellList = cfg.autoHatch.sellPets or {}
@@ -2862,6 +2872,8 @@ pcall(function() FavItemRemote:FireServer(tool) end)
 task.wait(delay or 0.1)
 end
 end
+local humU = Character and Character:FindFirstChildOfClass("Humanoid")
+if humU then pcall(function() humU:UnequipTools() end) end
 end
 local function uuidKey(u) return tostring(u or ""):gsub("[{}]", ""):lower() end
 local function waitTeamEquipped(teamName, timeoutSec)
