@@ -82,7 +82,7 @@ else error("[Velium Hub] Could not load VeliumMainLibrary!") end
 end
 end
 local UI = Library.new()
-local VELIUM_BUILD = "2026-09-16f"
+local VELIUM_BUILD = "2026-09-16g"
 if not Library.buildPetList then
 Library.buildPetList = function(self, parent, selected, favs, onClick, getKG2, getInventory2, isFav2, sortFn2)
 local T2 = self.T
@@ -1353,6 +1353,64 @@ local tabAuto = speedTabs:CreateTab({"AUTOMATION", TAB_ICONS.AUTOMATION})
 local tabTeams = speedTabs:CreateTab({"TEAMS", TAB_ICONS.TEAMS})
 local tabWebhook = speedTabs:CreateTab({"WEBHOOK", TAB_ICONS.WEBHOOK})
 local tabMisc = speedTabs:CreateTab({"MISC", TAB_ICONS.MISC})
+
+-- ============================================================
+-- Speed-native item helpers (thin wrappers for terse call sites)
+-- ============================================================
+local function spToggle(sec, order, title, content, default, cb)
+	return sec:AddToggle({LayoutOrder=order, Title=title, Content=content or "", Default=default, Callback=cb})
+end
+local function spInput(sec, order, title, content, default, cb)
+	return sec:AddInput({LayoutOrder=order, Title=title, Content=content or "", Default=default, Callback=cb})
+end
+local function spButton(sec, order, title, content, icon, cb)
+	return sec:AddButton({LayoutOrder=order, Title=title, Content=content or "", Icon=icon or "", Callback=cb})
+end
+local function spDropdown(sec, order, title, content, multi, opts, default, cb)
+	return sec:AddDropdown({LayoutOrder=order, Title=title, Content=content or "", Multi=multi, Options=opts, Default=default or {}, Callback=cb})
+end
+local function spLabel(sec, order, text)
+	return sec:AddParagraph({LayoutOrder=order, Title=text, Content=""})
+end
+
+-- Team dropdown helper + registry for post-load refresh
+local teamDropdowns = {}
+local function getTeamNameList()
+	local names, seen = {}, {}
+	if type(_G._NH_BUILTIN_TEAMS) == "table" then
+		for _, t in ipairs(_G._NH_BUILTIN_TEAMS) do
+			if type(t) == "table" and type(t.name) == "string" and not seen[t.name] then
+				seen[t.name] = true
+				table.insert(names, t.name)
+			end
+		end
+	end
+	for name in pairs(cfg.petTeams or {}) do
+		if not seen[name] then seen[name] = true; table.insert(names, name) end
+	end
+	table.sort(names)
+	return names
+end
+local function spTeamDD(sec, order, title, tbl, key)
+	local function build()
+		local opts = getTeamNameList()
+		local cur = tbl[key]
+		local def = (cur and table.find(opts, cur)) and {cur} or {}
+		return opts, def
+	end
+	local opts, def = build()
+	local dd = sec:AddDropdown({LayoutOrder=order, Title=title, Content="Choose a team", Multi=false, Options=opts, Default=def, Callback=function(v)
+		if v and v[1] ~= nil then tbl[key] = v[1]; saveConfig() end
+	end})
+	table.insert(teamDropdowns, {dd=dd, build=build})
+	return dd
+end
+local function refreshTeamDropdowns()
+	for _, ref in ipairs(teamDropdowns) do
+		local opts, def = ref.build()
+		ref.dd:Refresh(opts, def)
+	end
+end
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
@@ -1613,191 +1671,87 @@ end)
 -- HATCH TAB
 -- ============================================================
 do
-local function makeTeamDD(parent, label, configKey, order)
-local row = UI:frame(parent, UDim2.new(1,0,0,40), nil, T.BTN)
-row.LayoutOrder = order
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, label, UDim2.new(1,0,0,14), UDim2.new(0,0,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-local btn = UI:button(row, cfg.autoHatch[configKey] or "None selected",
-UDim2.new(1,-20,0,16), UDim2.new(0,0,1,-18), T.BTN, T.DIM, 8)
-btn.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(btn, 0,8,0,0); UI:stroke(btn, T.STROKE, 1)
-UI:label(row, "v", UDim2.new(0,20,0,16), UDim2.new(1,-20,1,-18), T.DIM, 8, Enum.TextXAlignment.Center)
-local listFrame = UI:frame(parent, UDim2.new(1,0,0,0), nil, T.BG)
-listFrame.LayoutOrder = order + 1
-listFrame.Visible = false; listFrame.AutomaticSize = Enum.AutomaticSize.Y
-UI:corner(listFrame, 5); UI:stroke(listFrame, T.STROKE, 1)
-local sf = UI:scroll(listFrame, UDim2.new(1,0,0,130))
-UI:list(sf, 2); UI:pad(sf, 2,2,2,2)
-local isOpen = false
-btn.MouseButton1Click:Connect(function()
-isOpen = not isOpen; listFrame.Visible = isOpen
-if isOpen then
-local count = buildTeamDD(sf, function(name)
-cfg.autoHatch[configKey] = name; saveConfig(); btn.Text = name
-listFrame.Visible = false; isOpen = false
-end, cfg.autoHatch[configKey], UI, cfg, T)
-listFrame.Size = UDim2.new(1,0,0, math.min((count * 24) + 6, 130))
-end
-end)
-return btn
-end
-local function makeNumInput(parent, label, configKey, defaultVal, order)
-local row = UI:frame(parent, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = order
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, label, UDim2.new(1,-72,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.autoHatch[configKey] or defaultVal), "",
-UDim2.new(0,64,0,20), UDim2.new(1,-68,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
-if val and val >= 0 then cfg.autoHatch[configKey] = val; saveConfig()
-else inp.Text = tostring(cfg.autoHatch[configKey] or defaultVal) end
-end)
-return inp
-end
-local hatchInner = tabHatch:AddSection("AUTO HATCH", true):GetContainer()
+local hatchSec = tabHatch:AddSection("AUTO HATCH", true)
+local hatchInner = hatchSec:GetContainer()
+-- ── Egg to place (Speed dropdown, search built in) ──
 do
-local eggPlaceLbl = UI:label(hatchInner, "EGG TO PLACE", UDim2.new(1,0,0,14), nil, T.ACCENT, 10)
-eggPlaceLbl.Font = Enum.Font.GothamBold; eggPlaceLbl.LayoutOrder = 1
-local eggList = {}
-local seen = {}
+local eggList, seen = {}, {}
 for _, pet in ipairs(PetJSON) do
 if pet.egg and not seen[pet.egg] then
 seen[pet.egg] = true
-table.insert(eggList, {key = pet.egg, name = pet.egg})
+table.insert(eggList, pet.egg)
 end
 end
-table.sort(eggList, function(a,b) return a.name < b.name end)
-local eggRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-eggRow.LayoutOrder = 2; UI:corner(eggRow, 5); UI:stroke(eggRow, T.STROKE, 1)
-local eggBtn = UI:button(eggRow, cfg.autoHatch.eggName or "Common Egg",
-UDim2.new(1,-20,1,0), UDim2.new(0,0,0,0), T.BTN, T.TEXT, 9)
-eggBtn.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(eggBtn, 0,8,0,0); UI:stroke(eggBtn, T.STROKE, 1)
-UI:label(eggRow, "v", UDim2.new(0,20,1,0), UDim2.new(1,-20,0,0), T.DIM, 9, Enum.TextXAlignment.Center)
-local eggListFrame = UI:frame(hatchInner, UDim2.new(1,0,0,0), nil, T.BG)
-eggListFrame.LayoutOrder = 3; eggListFrame.Visible = false; eggListFrame.AutomaticSize = Enum.AutomaticSize.Y
-UI:corner(eggListFrame, 5); UI:stroke(eggListFrame, T.STROKE, 1)
-local eggSearchInp = UI:input(eggListFrame, "", "Search egg...",
-UDim2.new(1,-8,0,22), UDim2.new(0,4,0,4))
-eggSearchInp.TextColor3 = T.TEXT; eggSearchInp.Font = Enum.Font.Gotham
-local eggSF = UI:scroll(eggListFrame, UDim2.new(1,0,0,120), UDim2.new(0,0,0,30))
-UI:list(eggSF, 2); UI:pad(eggSF, 2,2,2,2)
-local eggOpen = false
-local function rebuildEggList(q)
-q = q and string.lower(q) or ""
-for _, c in ipairs(eggSF:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local n = 0
-for i, egg in ipairs(eggList) do
-if q ~= "" and not string.lower(egg.name):find(q, 1, true) then continue end
-n = n + 1
-local isSel = cfg.autoHatch.eggName == egg.key
-local b = UI:button(eggSF, egg.name, UDim2.new(1,0,0,22), nil,
-(isSel and T.SEL_BG) or Color3.fromRGB(22, 22, 22),
-(isSel and T.SEL_TXT) or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b, 0,8,0,0); UI:stroke(b, (isSel and T.ACCENT) or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-cfg.autoHatch.eggName = egg.key; saveConfig(); eggBtn.Text = egg.name
-eggListFrame.Visible = false; eggOpen = false; eggSearchInp.Text = ""
+table.sort(eggList)
+local eggDefault = {}
+if cfg.autoHatch.eggName and table.find(eggList, cfg.autoHatch.eggName) then
+eggDefault = {cfg.autoHatch.eggName}
+end
+spDropdown(hatchSec, 1, "Egg to place", "Search & pick the egg", false, eggList, eggDefault, function(v)
+cfg.autoHatch.eggName = v[1] or "Common Egg"; saveConfig()
 end)
 end
-eggListFrame.Size = UDim2.new(1,0,0, math.min((n * 24) + 34, 160))
-end
-eggSearchInp:GetPropertyChangedSignal("Text"):Connect(function()
-rebuildEggList(eggSearchInp.Text) end)
-eggBtn.MouseButton1Click:Connect(function()
-eggOpen = not eggOpen; eggListFrame.Visible = eggOpen
-if eggOpen then
-eggSearchInp.Text = ""
-rebuildEggList("")
-end
-end)
-end
+-- ── Count / Spacing ──
 do
-local row = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 4
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Count", UDim2.new(0,50,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local countInp = UI:input(row, tostring(cfg.autoHatch.eggCount or 13), "",
-UDim2.new(0,40,0,20), UDim2.new(0,56,0.5,-10))
-countInp.FocusLost:Connect(function()
-local val = tonumber(countInp.Text)
-if val and val >= 1 then cfg.autoHatch.eggCount = val; saveConfig()
-else countInp.Text = tostring(cfg.autoHatch.eggCount or 13) end
+local cntInp
+cntInp = spInput(hatchSec, 2, "Count", "Eggs per hatch cycle", tostring(cfg.autoHatch.eggCount or 13), function(v)
+local n = tonumber(v)
+if n and n >= 1 then cfg.autoHatch.eggCount = n; saveConfig()
+elseif cntInp then cntInp:Set(tostring(cfg.autoHatch.eggCount or 13)) end
 end)
-UI:label(row, "Spacing", UDim2.new(0,50,1,0), UDim2.new(0,120,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local spaceInp = UI:input(row, tostring(cfg.autoHatch.eggSpacing or 7), "",
-UDim2.new(0,40,0,20), UDim2.new(0,170,0.5,-10))
-spaceInp.FocusLost:Connect(function()
-local val = tonumber(spaceInp.Text)
-if val and val >= 1 then cfg.autoHatch.eggSpacing = val; saveConfig()
-else spaceInp.Text = tostring(cfg.autoHatch.eggSpacing or 7) end
+local spInp
+spInp = spInput(hatchSec, 3, "Spacing", "Studs between eggs", tostring(cfg.autoHatch.eggSpacing or 7), function(v)
+local n = tonumber(v)
+if n and n >= 1 then cfg.autoHatch.eggSpacing = n; saveConfig()
+elseif spInp then spInp:Set(tostring(cfg.autoHatch.eggSpacing or 7)) end
 end)
 end
-do
-local methodRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-methodRow.LayoutOrder = 5
-UI:corner(methodRow, 5); UI:stroke(methodRow, T.STROKE, 1)
-UI:label(methodRow, "Place Method", UDim2.new(0,70,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local methodBtn = UI:button(methodRow, cfg.placeEggs.method or "Random",
-UDim2.new(0,70,0,20), UDim2.new(0,76,0.5,-10), T.BTN, T.TEXT, 9)
-UI:stroke(methodBtn, T.STROKE, 1)
-local methodMap = {Random = "Set", Set = "Random"}
-methodBtn.MouseButton1Click:Connect(function()
-cfg.placeEggs.method = methodMap[cfg.placeEggs.method] or "Random"
-methodBtn.Text = cfg.placeEggs.method
-saveConfig()
+-- ── Place method / max ──
+spDropdown(hatchSec, 4, "Place Method", "How eggs are positioned", false, {"Random", "Set"}, {cfg.placeEggs.method or "Random"}, function(v)
+cfg.placeEggs.method = v[1] or "Random"; saveConfig()
 end)
-UI:label(methodRow, "Max", UDim2.new(0,30,1,0), UDim2.new(0,160,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local maxInp = UI:input(methodRow, tostring(cfg.placeEggs.maxEggs or 20), "",
-UDim2.new(0,40,0,20), UDim2.new(0,190,0.5,-10))
-maxInp.FocusLost:Connect(function()
-local val = tonumber(maxInp.Text)
-if val and val >= 0 then cfg.placeEggs.maxEggs = val; saveConfig()
-else maxInp.Text = tostring(cfg.placeEggs.maxEggs or 20) end
+do
+local maxInp
+maxInp = spInput(hatchSec, 5, "Max eggs", "Maximum eggs placed per cycle", tostring(cfg.placeEggs.maxEggs or 20), function(v)
+local n = tonumber(v)
+if n and n >= 0 then cfg.placeEggs.maxEggs = n; saveConfig()
+elseif maxInp then maxInp:Set(tostring(cfg.placeEggs.maxEggs or 20)) end
 end)
 end
-makeTeamDD(hatchInner, "CD Team (Reduce cooldown)", "teamCD", 10)
-makeTeamDD(hatchInner, "Koi Team", "teamKoi", 13)
-makeTeamDD(hatchInner, "Seal Team (Sell)", "teamSeal", 16)
-makeTeamDD(hatchInner, "Bronto Team (Heavy hatch)", "teamBronto", 19)
+-- ── Team selectors (Speed dropdowns) ──
+spTeamDD(hatchSec, 10, "CD Team (Reduce cooldown)", cfg.autoHatch, "teamCD")
+spTeamDD(hatchSec, 11, "Koi Team", cfg.autoHatch, "teamKoi")
+spTeamDD(hatchSec, 12, "Seal Team (Sell)", cfg.autoHatch, "teamSeal")
+spTeamDD(hatchSec, 13, "Bronto Team (Heavy hatch)", cfg.autoHatch, "teamBronto")
+-- ── Egg ESP / pick-place ──
+spToggle(hatchSec, 20, "Egg ESP", "Highlight placed eggs", cfg.autoHatch.espEnabled, function(val)
+cfg.autoHatch.espEnabled = val; saveConfig()
+if HatchTrack.EggESP then HatchTrack.EggESP.on = val; if not val and HatchTrack.clearEggESP then HatchTrack.clearEggESP() end end
+end)
+spToggle(hatchSec, 21, "Don't Pick-Place saat Koi/Bronto/Seal active", "", cfg.autoHatch.dontPickPlace, function(val)
+cfg.autoHatch.dontPickPlace = val; saveConfig()
+end)
+-- ── Timing editor (custom overlay, kept) ──
 do
-local espRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-espRow.LayoutOrder = 25
-UI:corner(espRow, 5); UI:stroke(espRow, T.STROKE, 1)
-UI:label(espRow, "Egg ESP", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-UI:toggle(espRow, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.espEnabled,
-function(val) cfg.autoHatch.espEnabled = val; saveConfig(); if HatchTrack.EggESP then HatchTrack.EggESP.on = val; if not val and HatchTrack.clearEggESP then HatchTrack.clearEggESP() end end end)
-local dppRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-dppRow.LayoutOrder = 27
-UI:corner(dppRow, 5); UI:stroke(dppRow, T.STROKE, 1)
-UI:label(dppRow, "Don't Pick-Place saat Koi/Bronto/Seal active", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
-UI:toggle(dppRow, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.dontPickPlace,
-function(val) cfg.autoHatch.dontPickPlace = val; saveConfig() end)
 local timingBtnRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-timingBtnRow.LayoutOrder = 29
+timingBtnRow.LayoutOrder = 22
 UI:corner(timingBtnRow, 5); UI:stroke(timingBtnRow, T.STROKE, 1)
 local timingTeBtn, timingOverlay = UI:timingEditor(timingBtnRow, PageHatch, TIMING, cfg, saveConfig)
 if timingTeBtn then
 timingBtnRow.Size = UDim2.new(1,0,0,44)
 end
 end
+-- ── Auto feed ──
 do
-local row = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 31
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Auto Feed (sec)", UDim2.new(1,-72,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.autoHatch.autoFeedDelay or 0), "",
-UDim2.new(0,64,0,20), UDim2.new(0,130,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
-if val and val >= 0 then cfg.autoHatch.autoFeedDelay = val; saveConfig()
-else inp.Text = tostring(cfg.autoHatch.autoFeedDelay or 0) end
+local feedInp
+feedInp = spInput(hatchSec, 30, "Auto Feed (sec)", "Delay between feed actions", tostring(cfg.autoHatch.autoFeedDelay or 0), function(v)
+local n = tonumber(v)
+if n and n >= 0 then cfg.autoHatch.autoFeedDelay = n; saveConfig()
+elseif feedInp then feedInp:Set(tostring(cfg.autoHatch.autoFeedDelay or 0)) end
 end)
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.autoFeedEnabled or false,
-function(val) cfg.autoHatch.autoFeedEnabled = val; saveConfig() end)
+spToggle(hatchSec, 31, "Auto Feed enabled", "", cfg.autoHatch.autoFeedEnabled or false, function(val)
+cfg.autoHatch.autoFeedEnabled = val; saveConfig()
+end)
 end
 do
 local logPanel = UI:frame(hatchInner, UDim2.new(1,0,0,80), nil, T.PANEL)
@@ -1868,38 +1822,30 @@ end
 end
 local hatchToggle = UI:toggle(statusRow, UDim2.new(1,-48,0.5,-11), false, onHatchToggle)
 end
-do
-local brontoHdr = UI:label(hatchInner, "⭐ SPECIAL PET TO BRONTO", UDim2.new(1,0,0,16), nil, T.ACCENT, 10)
-brontoHdr.Font = Enum.Font.GothamBold; brontoHdr.LayoutOrder = 51
-end
-do
-local row = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 52
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Enable Special Pet to Bronto", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.specialBronto and cfg.autoHatch.specialBronto.enabled or false,
-function(val)
+-- ── Special pet → Bronto ──
+spLabel(hatchSec, 51, "⭐ SPECIAL PET TO BRONTO")
+spToggle(hatchSec, 52, "Enable Special Pet to Bronto", "", cfg.autoHatch.specialBronto and cfg.autoHatch.specialBronto.enabled or false, function(val)
 if not cfg.autoHatch.specialBronto then cfg.autoHatch.specialBronto = {enabled=false, pets={}} end
-cfg.autoHatch.specialBronto.enabled = val; saveConfig() end)
+cfg.autoHatch.specialBronto.enabled = val; saveConfig()
+end)
+do
+local thrInp
+thrInp = spInput(hatchSec, 53, "Bronto threshold (kg)", "", tostring(cfg.autoHatch.brontoThresh or 4), function(v)
+local n = tonumber(v)
+if n and n >= 0 then cfg.autoHatch.brontoThresh = n; saveConfig()
+elseif thrInp then thrInp:Set(tostring(cfg.autoHatch.brontoThresh or 4)) end
+end)
 end
-makeNumInput(hatchInner, "Bronto threshold (kg)", "brontoThresh", 4, 53)
 local spCountLbl
 do
-local row = UI:frame(hatchInner, UDim2.new(1,0,0,22), nil, T.BTN)
-row.LayoutOrder = 54
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-local n = 0; if cfg.autoHatch.specialBronto and cfg.autoHatch.specialBronto.pets then
-for _ in pairs(cfg.autoHatch.specialBronto.pets) do n = n + 1 end end
-spCountLbl = UI:label(row, "Pets: " .. (n == 0 and "NONE" or n .. " selected"),
-UDim2.new(1,-90,1,0), UDim2.new(0,4,0,0), T.DIM, 9)
-spCountLbl.Font = Enum.Font.Gotham
-local sb = UI:button(row, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(sb, T.STROKE, 1)
+local spOpen
 local function spUpdate()
 local cn = 0; if cfg.autoHatch.specialBronto and cfg.autoHatch.specialBronto.pets then
 for _ in pairs(cfg.autoHatch.specialBronto.pets) do cn = cn + 1 end end
-spCountLbl.Text = cn == 0 and "Pets: NONE" or ("Pets: " .. cn .. " selected")
-spCountLbl.TextColor3 = cn == 0 and T.DIM or T.ACCENT end
+spCountLbl:Set("Select Special Pets", cn == 0 and "NONE" or (cn .. " selected"))
+spCountLbl.Content.TextColor3 = cn == 0 and T.DIM or T.ACCENT
+end
+spCountLbl = spButton(hatchSec, 54, "Select Special Pets", "NONE", "", function() if spOpen then spOpen() end end)
 local ov = UI:frame(PageHatch, UDim2.new(1,0,1,0), nil, T.BG)
 ov.Visible = false; ov.ZIndex = 25
 local oh = UI:frame(ov, UDim2.new(1,0,0,30), nil, T.PANEL)
@@ -1953,59 +1899,52 @@ cfg.autoHatch.specialBronto.pets[pet.name] = not allSel end
 saveConfig(); rebuild() end
 selAllBtn.MouseButton1Click:Connect(selectAllFiltered)
 osp:GetPropertyChangedSignal("Text"):Connect(rebuild)
-sb.MouseButton1Click:Connect(function() ov.Visible=true; rebuild() end)
+spOpen = function() ov.Visible=true; rebuild() end
+spUpdate()
 end
 do
-local sellInner = tabHatch:AddSection("SELL SETTINGS", true):GetContainer()
-makeNumInput(sellInner, "Sell below (kg)", "sellThresh", 0, 3)
-makeNumInput(sellInner, "Fav delay (sec)", "favDelay", 0.1, 5)
+local sellSec = tabHatch:AddSection("SELL SETTINGS", true)
+local sellInner = sellSec:GetContainer()
 do
-local row = UI:frame(sellInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 7
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Auto Sell ONLY When Inventory Full", UDim2.new(1,-120,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.autoHatch.petInvMax or 200), "",
-UDim2.new(0,48,0,20), UDim2.new(0,180,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
-if val and val >= 1 then cfg.autoHatch.petInvMax = val; saveConfig()
-else inp.Text = tostring(cfg.autoHatch.petInvMax or 200) end
+local a
+a = spInput(sellSec, 3, "Sell below (kg)", "", tostring(cfg.autoHatch.sellThresh or 0), function(v)
+local n = tonumber(v)
+if n and n >= 0 then cfg.autoHatch.sellThresh = n; saveConfig()
+elseif a then a:Set(tostring(cfg.autoHatch.sellThresh or 0)) end
 end)
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.autoSellWhenFull,
-function(val) cfg.autoHatch.autoSellWhenFull = val; saveConfig() end)
+local b
+b = spInput(sellSec, 5, "Fav delay (sec)", "", tostring(cfg.autoHatch.favDelay or 0.1), function(v)
+local n = tonumber(v)
+if n and n >= 0 then cfg.autoHatch.favDelay = n; saveConfig()
+elseif b then b:Set(tostring(cfg.autoHatch.favDelay or 0.1)) end
+end)
 end
 do
-local saRow = UI:frame(sellInner, UDim2.new(1,0,0,26), nil, T.BTN)
-saRow.LayoutOrder = 8
-UI:corner(saRow, 5); UI:stroke(saRow, T.STROKE, 1)
-UI:label(saRow, "SELL ALL PETS (off = one by one)", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-UI:toggle(saRow, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.sellAll,
-function(val) cfg.autoHatch.sellAll = val; saveConfig() end)
+local invInp
+invInp = spInput(sellSec, 7, "Auto Sell ONLY When Inventory Full", "Max pets before selling", tostring(cfg.autoHatch.petInvMax or 200), function(v)
+local n = tonumber(v)
+if n and n >= 1 then cfg.autoHatch.petInvMax = n; saveConfig()
+elseif invInp then invInp:Set(tostring(cfg.autoHatch.petInvMax or 200)) end
+end)
+spToggle(sellSec, 8, "SELL ALL PETS (off = one by one)", "", cfg.autoHatch.sellAll, function(val)
+cfg.autoHatch.sellAll = val; saveConfig()
+end)
+spToggle(sellSec, 9, "Enable Selling", "", cfg.autoHatch.sellEnabled ~= false, function(val)
+cfg.autoHatch.sellEnabled = val; saveConfig()
+end)
 end
-do
-local seRow = UI:frame(sellInner, UDim2.new(1,0,0,26), nil, T.BTN)
-seRow.LayoutOrder = 9
-UI:corner(seRow, 5); UI:stroke(seRow, T.STROKE, 1)
-UI:label(seRow, "Enable Selling", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-UI:toggle(seRow, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.sellEnabled ~= false,
-function(val) cfg.autoHatch.sellEnabled = val; saveConfig() end)
-end
-local sellRow = UI:frame(sellInner, UDim2.new(1,0,0,26), nil, T.BTN)
-sellRow.LayoutOrder = 10
-UI:corner(sellRow, 5); UI:stroke(sellRow, T.STROKE, 1)
+-- ── Sell-pet picker (custom overlay, kept) ──
 local sellCount = 0
 for _ in pairs(cfg.autoHatch.sellPets or {}) do sellCount = sellCount + 1 end
-local sellLbl = UI:label(sellRow, "Sell pets: " .. (sellCount == 0 and "NONE" or sellCount .. " selected"),
-UDim2.new(1,-100,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
-sellLbl.Font = Enum.Font.Gotham
-local sellSelBtn = UI:button(sellRow, "Select pets >", UDim2.new(0,90,0,20),
-UDim2.new(1,-94,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(sellSelBtn, T.STROKE, 1)
+local sellLbl
+do
+local sellOpen
 local function refreshSellCount()
 sellCount = 0; for _ in pairs(cfg.autoHatch.sellPets or {}) do sellCount = sellCount + 1 end
-sellLbl.Text = sellCount == 0 and "Sell pets: NONE" or ("Sell pets: " .. sellCount .. " selected")
-sellLbl.TextColor3 = sellCount == 0 and T.DIM or T.ACCENT
+sellLbl:Set("Select Pets to Sell", sellCount == 0 and "NONE" or (sellCount .. " selected"))
+sellLbl.Content.TextColor3 = sellCount == 0 and T.DIM or T.ACCENT
 end
+sellLbl = spButton(sellSec, 10, "Select Pets to Sell", "NONE", "", function() if sellOpen then sellOpen() end end)
 local sellOverlay = UI:frame(PageHatch, UDim2.new(1,0,1,0), nil, T.BG)
 sellOverlay.Visible = false; sellOverlay.ZIndex = 25
 local soBar = UI:frame(sellOverlay, UDim2.new(1,0,0,26), nil, T.PANEL)
@@ -2071,68 +2010,41 @@ end
 saveConfig(); refreshSellCount(); rebuildSellOverlay()
 end)
 soSearch:GetPropertyChangedSignal("Text"):Connect(rebuildSellOverlay)
-sellSelBtn.MouseButton1Click:Connect(function() sellOverlay.Visible = true; rebuildSellOverlay() end)
+sellOpen = function() sellOverlay.Visible = true; rebuildSellOverlay() end
+refreshSellCount()
 end
-local boostInner = tabHatch:AddSection("PET BOOST", false):GetContainer()
-do
-do
-local m1Row = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
-m1Row.LayoutOrder = 1; UI:corner(m1Row, 5); UI:stroke(m1Row, T.STROKE, 1)
-UI:label(m1Row, "Mode 1: Boost selected pets", UDim2.new(1,-56,1,0), UDim2.new(0,6,0,0), T.TEXT, 9)
-UI:toggle(m1Row, UDim2.new(1,-48,0.5,-11), cfg.toggles.mode1boost,
-function(val) cfg.toggles.mode1boost = val; saveConfig(); VeliumNotify("Mode 1 Boost", val) end)
-local boRow = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
-boRow.LayoutOrder = 2; UI:corner(boRow, 5); UI:stroke(boRow, T.STROKE, 1)
-local toyTypes = { "Small Toy", "Medium Toy", "Large Toy" }
-local boLbl = UI:label(boRow, "Toy: ", UDim2.new(0,36,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
-local function getToyText()
-local sel = {}
-for k in pairs(cfg.petboost.mode1.boostOptions or {}) do table.insert(sel, k) end
-return #sel == 0 and "None" or table.concat(sel, ", ")
 end
-boLbl.Text = "Toy: " .. getToyText()
-local boBtn = UI:button(boRow, "Select >", UDim2.new(0,70,0,20), UDim2.new(1,-76,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(boBtn, T.STROKE, 1)
-local boOv = UI:frame(PageHatch, UDim2.new(1,0,1,0), nil, T.BG)
-boOv.Visible = false; boOv.ZIndex = 25
-local boBar = UI:frame(boOv, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(boBar, T.STROKE, 1)
-UI:label(boBar, "Select Toy Type", UDim2.new(1,-30,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local boX = UI:button(boBar, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(boX, T.ERROR, 1)
-boX.MouseButton1Click:Connect(function() boOv.Visible = false; boLbl.Text = "Toy: " .. getToyText() end)
-local boSF = UI:scroll(boOv, UDim2.new(1,0,1,-36), UDim2.new(0,0,0,32))
-UI:list(boSF, 3); UI:pad(boSF, 3,4,4,3)
-for _, toyName in ipairs(toyTypes) do
-local isSel = cfg.petboost.mode1.boostOptions and cfg.petboost.mode1.boostOptions[toyName]
-local b = UI:button(boSF, toyName, UDim2.new(1,0,0,30), nil,
-isSel and T.SEL_BG or Color3.fromRGB(13,13,13), isSel and T.SEL_TXT or T.TEXT, 10)
-UI:corner(b, 5); UI:stroke(b, isSel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-if not cfg.petboost.mode1.boostOptions then cfg.petboost.mode1.boostOptions = {} end
-if cfg.petboost.mode1.boostOptions[toyName] then cfg.petboost.mode1.boostOptions[toyName] = nil
-else cfg.petboost.mode1.boostOptions[toyName] = true end
-saveConfig(); boLbl.Text = "Toy: " .. getToyText()
-for _, child in ipairs(boSF:GetChildren()) do
-if child:IsA("TextButton") and child.Text == toyName then
-local s = cfg.petboost.mode1.boostOptions[toyName]
-child.BackgroundColor3 = s and T.SEL_BG or Color3.fromRGB(13,13,13)
-child.TextColor3 = s and T.SEL_TXT or T.TEXT
-local st = child:FindFirstChildWhichIsA("UIStroke")
-if st then st.Color = s and T.ACCENT or T.STROKE end
-end end
+local boostSec = tabHatch:AddSection("PET BOOST", false)
+local boostInner = boostSec:GetContainer()
+do
+spToggle(boostSec, 1, "Mode 1: Boost selected pets", "Auto-apply toys to the chosen pets", cfg.toggles.mode1boost, function(val)
+cfg.toggles.mode1boost = val; saveConfig(); VeliumNotify("Mode 1 Boost", val)
 end)
+local toyTypes = { "Small Toy", "Medium Toy", "Large Toy" }
+local toyDefault = {}
+for _, toyName in ipairs(toyTypes) do
+if cfg.petboost.mode1.boostOptions and cfg.petboost.mode1.boostOptions[toyName] then
+table.insert(toyDefault, toyName)
 end
-boBtn.MouseButton1Click:Connect(function() boOv.Visible = true end)
 end
-local spRow = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
-spRow.LayoutOrder = 3; UI:corner(spRow, 5); UI:stroke(spRow, T.STROKE, 1)
+spDropdown(boostSec, 2, "Toy Type", "Which toys to apply", true, toyTypes, toyDefault, function(v)
+local newOpts = {}
+for _, name in ipairs(v) do newOpts[name] = true end
+cfg.petboost.mode1.boostOptions = newOpts
+saveConfig()
+end)
+-- ── Boost pet picker (custom overlay, kept) ──
 local spCount = 0
 for _ in pairs(cfg.petboost.mode1.selPets or {}) do spCount = spCount + 1 end
-local spLbl = UI:label(spRow, "Pets: " .. (spCount == 0 and "ALL (no filter)" or spCount .. " selected"),
-UDim2.new(1,-90,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
-local spBtn = UI:button(spRow, "Select >", UDim2.new(0,70,0,20), UDim2.new(1,-76,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(spBtn, T.STROKE, 1)
+local spLbl
+do
+local spOpen
+local function refreshSpCount()
+local cn = 0; for _ in pairs(cfg.petboost.mode1.selPets or {}) do cn = cn + 1 end
+spLbl:Set("Select Pets to Boost", cn == 0 and "ALL (no filter)" or (cn .. " selected"))
+spLbl.Content.TextColor3 = cn == 0 and T.DIM or T.ACCENT
+end
+spLbl = spButton(boostSec, 3, "Select Pets to Boost", "ALL (no filter)", "", function() if spOpen then spOpen() end end)
 local spOv = UI:frame(PageHatch, UDim2.new(1,0,1,0), nil, T.BG)
 spOv.Visible = false; spOv.ZIndex = 25
 local spBar = UI:frame(spOv, UDim2.new(1,0,0,30), nil, T.PANEL)
@@ -2144,9 +2056,7 @@ local spX = UI:button(spBar, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11)
 UI:stroke(spX, T.ERROR, 1)
 spX.MouseButton1Click:Connect(function()
 spOv.Visible = false
-local cn = 0; for _ in pairs(cfg.petboost.mode1.selPets or {}) do cn = cn + 1 end
-spLbl.Text = cn == 0 and "Pets: ALL (no filter)" or ("Pets: " .. cn .. " selected")
-spLbl.TextColor3 = cn == 0 and T.DIM or T.ACCENT
+refreshSpCount()
 end)
 local spSearch = UI:input(spOv, "", "Search pet..", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
 spSearch.TextColor3 = T.TEXT; spSearch.Font = Enum.Font.Gotham
@@ -2185,37 +2095,23 @@ for _, pet in ipairs(PetJSON) do
 cfg.petboost.mode1.selPets[pet.name] = allSel and nil or true end
 saveConfig()
 end)
-spBtn.MouseButton1Click:Connect(function() spOv.Visible = true; rebuildSpOverlay() end)
+spOpen = function() spOv.Visible = true; rebuildSpOverlay() end
+refreshSpCount()
 end
-do
-local m2Row = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
-m2Row.LayoutOrder = 10; UI:corner(m2Row, 5); UI:stroke(m2Row, T.STROKE, 1)
-UI:label(m2Row, "Mode 2: Boost pet pairs", UDim2.new(1,-56,1,0), UDim2.new(0,6,0,0), T.TEXT, 9)
-UI:toggle(m2Row, UDim2.new(1,-48,0.5,-11), cfg.toggles.mode2boost,
-function(val) cfg.toggles.mode2boost = val; saveConfig(); VeliumNotify("Mode 2 Boost", val) end)
-local m2Info = UI:label(boostInner, "Pairs: pet + toy type. Auto-apply boost when ready.",
-UDim2.new(1,-8,0,14), UDim2.new(0,4,0,0), T.DIM, 8)
-m2Info.LayoutOrder = 11; m2Info.TextWrapped = true
-end
-do
-local feedRow = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
-feedRow.LayoutOrder = 20; UI:corner(feedRow, 5); UI:stroke(feedRow, T.STROKE, 1)
-UI:label(feedRow, "FEED PETS", UDim2.new(1,-48,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-UI:toggle(feedRow, UDim2.new(1,-48,0.5,-11), cfg.toggles.autoFeed,
-function(val) cfg.toggles.autoFeed = val; saveConfig(); VeliumNotify("Auto Feed", val) end)
-local hRow = UI:frame(boostInner, UDim2.new(1,0,0,26), nil, T.BTN)
-hRow.LayoutOrder = 21; UI:corner(hRow, 5); UI:stroke(hRow, T.STROKE, 1)
-UI:label(hRow, "Hunger %", UDim2.new(0,60,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local hInp = UI:input(hRow, tostring(cfg.autoFeed.hungerThreshold or 50), "",
-UDim2.new(0,40,0,20), UDim2.new(0,66,0.5,-10))
-hInp.FocusLost:Connect(function()
-local val = tonumber(hInp.Text)
-if val and val >= 0 and val <= 100 then cfg.autoFeed.hungerThreshold = val; saveConfig()
-else hInp.Text = tostring(cfg.autoFeed.hungerThreshold or 50) end
+spToggle(boostSec, 10, "Mode 2: Boost pet pairs", "Pairs: pet + toy type. Auto-apply boost when ready.", cfg.toggles.mode2boost, function(val)
+cfg.toggles.mode2boost = val; saveConfig(); VeliumNotify("Mode 2 Boost", val)
 end)
-local infoLbl = UI:label(boostInner, "Auto feed equipped pets when hunger is low.",
-UDim2.new(1,-8,0,14), UDim2.new(0,4,0,0), T.DIM, 8)
-infoLbl.LayoutOrder = 22; infoLbl.TextWrapped = true
+end
+do
+spToggle(boostSec, 20, "FEED PETS", "Auto feed equipped pets when hunger is low", cfg.toggles.autoFeed, function(val)
+cfg.toggles.autoFeed = val; saveConfig(); VeliumNotify("Auto Feed", val)
+end)
+local hInp
+hInp = spInput(boostSec, 21, "Hunger %", "Feed when hunger drops below this", tostring(cfg.autoFeed.hungerThreshold or 50), function(v)
+local n = tonumber(v)
+if n and n >= 0 and n <= 100 then cfg.autoFeed.hungerThreshold = n; saveConfig()
+elseif hInp then hInp:Set(tostring(cfg.autoFeed.hungerThreshold or 50)) end
+end)
 end
 local RNG = Random.new()
 local function getMyFarm()
@@ -3084,40 +2980,44 @@ local tmSection = tabTeams:AddSection("PET TEAMS", true)
 local tmScroll = tmSection:GetContainer()
 
 -- Title
-local title = UI:label(tmScroll, "Pet Teams", UDim2.new(1,0,0,18), nil, T.ACCENT, 13)
-title.LayoutOrder = 0
+spLabel(tmSection, 0, "Pet Teams")
 
 -- Save row
-local saveRow = UI:frame(tmScroll, UDim2.new(1,0,0,28), nil, T.BG)
-saveRow.LayoutOrder = 1
-local teamNameInput = UI:input(saveRow, "", "Team name...",
-	UDim2.new(1,-90,0,22), UDim2.new(0,0,0,2))
-teamNameInput.TextColor3 = T.TEXT
-local saveBtn = UI:button(saveRow, "Save Active Pets", UDim2.new(0,86,0,22),
-	UDim2.new(1,-88,0,2), T.ACCENT, T.SEL_TXT, 10)
-UI:stroke(saveBtn, T.ACCENT, 1)
+local teamNameInp
+teamNameInp = spInput(tmSection, 1, "Team Name", "Nama team baru...", "", function() end)
+local saveBtn
+saveBtn = spButton(tmSection, 2, "Save Active Pets", "Simpan pet yang sedang di-equip", "", function() end)
 
 -- Status message
-local saveMsg = UI:label(tmScroll, "", UDim2.new(1,0,0,14), nil, T.DIM, 10)
-saveMsg.Font = Enum.Font.Gotham; saveMsg.LayoutOrder = 2
+local saveMsg
+local function setSaveMsg(text, color)
+saveMsg:Set(text ~= "" and text or " ", "")
+saveMsg.Title.TextColor3 = color or T.DIM
+end
 
 -- ── BUILT-IN TEAMS label + container (rendered ABOVE saved teams)
-local builtinLbl = UI:label(tmScroll, "Built-In Teams", UDim2.new(1,0,0,16), nil, T.DIM, 11)
-builtinLbl.Font = Enum.Font.Gotham; builtinLbl.LayoutOrder = 3
+spLabel(tmSection, 3, "Built-In Teams")
 
-local builtinContainer = UI:frame(tmScroll, UDim2.new(1,0,0,0), nil, T.BG)
+local builtinContainer = Instance.new("Frame")
+builtinContainer.BackgroundTransparency = 1
+builtinContainer.Size = UDim2.new(1,0,0,0)
 builtinContainer.LayoutOrder = 4
 builtinContainer.AutomaticSize = Enum.AutomaticSize.Y
+builtinContainer.Parent = tmScroll
 UI:list(builtinContainer, 4)
 
 -- ── SAVED TEAMS label + container (rendered BELOW built-ins)
-local savedLbl = UI:label(tmScroll, "Saved Teams", UDim2.new(1,0,0,16), nil, T.DIM, 11)
-savedLbl.Font = Enum.Font.Gotham; savedLbl.LayoutOrder = 5
+spLabel(tmSection, 5, "Saved Teams")
 
-local teamsContainer = UI:frame(tmScroll, UDim2.new(1,0,0,0), nil, T.BG)
+local teamsContainer = Instance.new("Frame")
+teamsContainer.BackgroundTransparency = 1
+teamsContainer.Size = UDim2.new(1,0,0,0)
 teamsContainer.LayoutOrder = 6
 teamsContainer.AutomaticSize = Enum.AutomaticSize.Y
+teamsContainer.Parent = tmScroll
 UI:list(teamsContainer, 4)
+
+saveMsg = spLabel(tmSection, 7, " ")
 
 -- ── Inline card builders — pixel-matched to old Velium Hub design ──
 -- Layout per card:
@@ -3410,22 +3310,20 @@ local function rebuildTeams()
 	task.defer(function() pcall(function() tmSection:Resize() end) end)
 end
 
-saveBtn.MouseButton1Click:Connect(function()
-	local name = teamNameInput.Text
-	if name == "" then name = "Team_" .. (os.time() % 10000) end
+saveBtn.ButtonButton.Activated:Connect(function()
+	local name = teamNameInp.Value
+	if name == nil or name == "" then name = "Team_" .. (os.time() % 10000) end
 	local ok, active = pcall(getActivePets)
 	if not ok or #active == 0 then
-		saveMsg.Text = "No active pets found! Equip pets first."
-		saveMsg.TextColor3 = T.ERROR
-		task.delay(3, function() saveMsg.Text = "" end)
+		setSaveMsg("No active pets found! Equip pets first.", T.ERROR)
+		task.delay(3, function() setSaveMsg("") end)
 		return
 	end
 	cfg.petTeams[name] = {uuids = active}
 	saveConfig()
-	teamNameInput.Text = ""
-	saveMsg.Text = "Saved '" .. name .. "' (" .. #active .. " pets)"
-	saveMsg.TextColor3 = T.SUCCESS
-	task.delay(3, function() saveMsg.Text = "" end)
+	teamNameInp:Set("")
+	setSaveMsg("Saved '" .. name .. "' (" .. #active .. " pets)", T.SUCCESS)
+	task.delay(3, function() setSaveMsg("") end)
 	local ok2, err = pcall(rebuildTeams)
 	if not ok2 then warn("[Velium Hub] rebuildTeams error: " .. tostring(err)) end
 	for _, ref in ipairs(ddRefs) do pcall(function() ref.Refresh() end) end
@@ -3442,7 +3340,7 @@ end
 -- MISC TAB
 -- ============================================================
 do
-local inner = tabMisc:AddSection("VISIBILITY", true):GetContainer()
+local visSec = tabMisc:AddSection("VISIBILITY", true)
 local visConnections = {}
 local function hidePart(obj)
 if obj:IsA("BasePart") or obj:IsA("UnionOperation") or obj:IsA("MeshPart") then
@@ -3472,13 +3370,7 @@ end
 for _, plot in ipairs(farm:GetChildren()) do processPlot(plot) end
 table.insert(visConnections, farm.ChildAdded:Connect(function(p) task.wait(0.5); processPlot(p) end))
 end
-local row = UI:frame(inner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 1
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-local hfpLbl = UI:label(row, "Hide Farm Plants", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9)
-hfpLbl.Font = Enum.Font.GothamBold; hfpLbl.TextYAlignment = Enum.TextYAlignment.Center
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.toggles.hidePlants,
-function(val)
+spToggle(visSec, 1, "Hide Farm Plants", "", cfg.toggles.hidePlants, function(val)
 cfg.toggles.hidePlants = val; saveConfig(); VeliumNotify("Hide Plants", val)
 if val then hideFarmPlants()
 else
@@ -3486,53 +3378,33 @@ for _, c in ipairs(visConnections) do pcall(function() c:Disconnect() end) end
 table.clear(visConnections)
 end
 end)
-if cfg.toggles.hidePlants then hideFarmPlants() end
-local row2 = UI:frame(inner, UDim2.new(1,0,0,26), nil, T.BTN)
-row2.LayoutOrder = 2
-UI:corner(row2, 5); UI:stroke(row2, T.STROKE, 1)
-local hnLbl = UI:label(row2, "Hide Notification", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9)
-hnLbl.Font = Enum.Font.GothamBold; hnLbl.TextYAlignment = Enum.TextYAlignment.Center
-UI:toggle(row2, UDim2.new(1,-48,0.5,-11), cfg.toggles.hideNotif,
-function(val) cfg.toggles.hideNotif = val; saveConfig() end)
-local inner = tabMisc:AddSection("AUTO RENEW SERVER", true):GetContainer()
-local jidRow = UI:frame(inner, UDim2.new(1,0,0,26), nil, T.BTN)
-jidRow.LayoutOrder = 1
-UI:corner(jidRow, 5); UI:stroke(jidRow, T.STROKE, 1)
-local jidLbl = UI:label(jidRow, "Job: " .. tostring(game.JobId),
-UDim2.new(1,0,1,0), UDim2.new(0,6,0,0), T.DIM, 8)
-jidLbl.Font = Enum.Font.Gotham; jidLbl.TextTruncate = Enum.TextTruncate.AtEnd
-jidLbl.TextXAlignment = Enum.TextXAlignment.Left
-local svRow = UI:frame(inner, UDim2.new(1,0,0,26), nil, T.BTN)
-svRow.LayoutOrder = 2
-UI:corner(svRow, 5); UI:stroke(svRow, T.STROKE, 1)
-local svLbl = UI:label(svRow, "Version: " .. tostring(game.PlaceVersion),
-UDim2.new(1,0,1,0), UDim2.new(0,6,0,0), T.DIM, 8)
-svLbl.Font = Enum.Font.Gotham; svLbl.TextXAlignment = Enum.TextXAlignment.Left
-local intRow = UI:frame(inner, UDim2.new(1,0,0,26), nil, T.BTN)
-intRow.LayoutOrder = 3
-UI:corner(intRow, 5); UI:stroke(intRow, T.STROKE, 1)
-UI:label(intRow, "Interval (min)", UDim2.new(1,-72,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local rsInterval = cfg.misc.rsInterval
-local intInput = UI:input(intRow, tostring(rsInterval), "",
-UDim2.new(0,64,0,20), UDim2.new(1,-68,0.5,-10))
-intInput.FocusLost:Connect(function()
-local val = tonumber(intInput.Text)
-if val and val >= 1 then rsInterval = val; cfg.misc.rsInterval = val; saveConfig()
-else intInput.Text = tostring(rsInterval) end
+spToggle(visSec, 2, "Hide Notification", "", cfg.toggles.hideNotif, function(val)
+cfg.toggles.hideNotif = val; saveConfig()
 end)
-local cdRow = UI:frame(inner, UDim2.new(1,0,0,26), nil, T.BTN)
+end
+do
+local arSec = tabMisc:AddSection("AUTO RENEW SERVER", true)
+spLabel(arSec, 1, "Job: " .. tostring(game.JobId))
+spLabel(arSec, 2, "Version: " .. tostring(game.PlaceVersion))
+local rsInterval = cfg.misc.rsInterval
+do
+local intInput
+intInput = spInput(arSec, 3, "Interval (min)", "Auto rejoin countdown", tostring(rsInterval), function(v)
+local val = tonumber(v)
+if val and val >= 1 then rsInterval = val; cfg.misc.rsInterval = val; saveConfig()
+elseif intInput then intInput:Set(tostring(rsInterval)) end
+end)
+end
+local cdLbl
+do
+local cdRow = UI:frame(arSec:GetContainer(), UDim2.new(1,0,0,22), nil, T.DARK_CARD)
 cdRow.LayoutOrder = 4
-UI:corner(cdRow, 5); UI:stroke(cdRow, T.STROKE, 1)
-local cdLbl = UI:label(cdRow, "Next rejoin: --:--",
-UDim2.new(1,0,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
+UI:corner(cdRow,5); UI:stroke(cdRow,T.STROKE,1)
+cdLbl = UI:label(cdRow, "Next rejoin: --:--", UDim2.new(1,0,1,0), UDim2.new(0,8,0,0), T.DIM, 9)
 cdLbl.Font = Enum.Font.Gotham; cdLbl.TextXAlignment = Enum.TextXAlignment.Left
-local togRow = UI:frame(inner, UDim2.new(1,0,0,26), nil, T.BTN)
-togRow.LayoutOrder = 5
-UI:corner(togRow, 5); UI:stroke(togRow, T.STROKE, 1)
-UI:label(togRow, "AUTO RENEW", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
+end
 local running = false
-UI:toggle(togRow, UDim2.new(1,-48,0.5,-11), cfg.toggles.autoRefresh,
-function(val)
+spToggle(arSec, 5, "AUTO RENEW", "", cfg.toggles.autoRefresh, function(val)
 cfg.toggles.autoRefresh = val; saveConfig(); VeliumNotify("Auto Renew", val)
 if val then
 running = true
@@ -3556,23 +3428,25 @@ else
 running = false; cdLbl.Text = "Next rejoin: --:--"
 end
 end)
-local twInner = tabMisc:AddSection("TRADE WORLD", true):GetContainer()
+end
 do
-local row = UI:frame(twInner, UDim2.new(1,0,0,26), nil, T.BTN)
+local twSec = tabMisc:AddSection("TRADE WORLD", true)
+local statusLabel
+do
+local row = UI:frame(twSec:GetContainer(), UDim2.new(1,0,0,22), nil, T.DARK_CARD)
 row.LayoutOrder = 1
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Auto Go To Trade World", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-local statusLabel = UI:label(row, "IDLE", UDim2.new(0,100,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
+UI:corner(row,5); UI:stroke(row,T.STROKE,1)
+statusLabel = UI:label(row, "Trade World: IDLE", UDim2.new(1,0,1,0), UDim2.new(0,8,0,0), T.DIM, 9)
 statusLabel.Font = Enum.Font.Gotham
+end
 local tradeRunning = false
 local TravelToTradeWorld = RS:WaitForChild("GameEvents"):WaitForChild("TradeWorld"):FindFirstChild("TravelToTradeWorld")
 local TravelToMainWorld = RS:WaitForChild("GameEvents"):FindFirstChild("TravelToMainWorld")
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.toggles.autoTradeWorld,
-function(val)
+spToggle(twSec, 2, "Auto Go To Trade World", "Cycle between trade world and main world", cfg.toggles.autoTradeWorld, function(val)
 cfg.toggles.autoTradeWorld = val; saveConfig(); VeliumNotify("Trade World", val)
 if val then
 tradeRunning = true
-statusLabel.Text = "TRADING"
+statusLabel.Text = "Trade World: TRADING"
 statusLabel.TextColor3 = T.SUCCESS
 task.spawn(function()
 while tradeRunning do
@@ -3585,14 +3459,13 @@ end
 end)
 else
 tradeRunning = false
-statusLabel.Text = "IDLE"
+statusLabel.Text = "Trade World: IDLE"
 statusLabel.TextColor3 = T.DIM
 end
 end)
 end
-end
 do
-local buyInner = tabMisc:AddSection("AUTO BUY", true):GetContainer()
+local buySec = tabMisc:AddSection("AUTO BUY", true)
 local buyOv = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 buyOv.Visible = false; buyOv.ZIndex = 25
 local buyBar = UI:frame(buyOv, UDim2.new(1,0,0,30), nil, T.PANEL)
@@ -3609,12 +3482,13 @@ UI:list(buySF, 3); UI:pad(buySF, 3,4,4,3)
 local buyKind, buyKindDK = "egg", "PetEggData"
 local buyLbls = {}
 local function refreshBuyLbl()
-for k, lbl in pairs(buyLbls) do
+for k, btn in pairs(buyLbls) do
 local st = cfg.autoBuy and cfg.autoBuy[k]
 local n = 0
 if st and st.items then for _ in pairs(st.items) do n = n + 1 end end
-lbl.Text = n == 0 and "NONE" or (n .. " selected")
-lbl.TextColor3 = n == 0 and T.DIM or T.ACCENT
+local txt = n == 0 and "NONE" or (n .. " selected")
+btn:Set(nil, txt)
+btn.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
 end
 end
 local function rebuildBuy()
@@ -3667,55 +3541,27 @@ local buySpecs = {
 {key = "gear", label = "Auto Buy Gears", pick = "Gears", dk = "GearData"},
 }
 for bi, spec in ipairs(buySpecs) do
-local trow = UI:frame(buyInner, UDim2.new(1,0,0,26), nil, T.BTN)
-trow.LayoutOrder = bi * 2 - 1
-UI:corner(trow, 5); UI:stroke(trow, T.STROKE, 1)
-UI:label(trow, spec.label, UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
 local kk = spec.key
 if not cfg.autoBuy[kk] then cfg.autoBuy[kk] = {on=false, items={}} end
-UI:toggle(trow, UDim2.new(1,-48,0.5,-11), cfg.autoBuy[kk].on,
-function(val) cfg.autoBuy[kk].on = val; saveConfig() end)
-local prow = UI:frame(buyInner, UDim2.new(1,0,0,26), nil, T.BTN)
-prow.LayoutOrder = bi * 2
-UI:corner(prow, 5); UI:stroke(prow, T.STROKE, 1)
-local clbl = UI:label(prow, "NONE", UDim2.new(1,-100,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
-clbl.Font = Enum.Font.Gotham
-buyLbls[kk] = clbl
-local sbtn = UI:button(prow, "Select >", UDim2.new(0,90,0,20), UDim2.new(1,-94,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(sbtn, T.STROKE, 1)
+spToggle(buySec, bi * 2 - 1, spec.label, "", cfg.autoBuy[kk].on, function(val)
+cfg.autoBuy[kk].on = val; saveConfig()
+end)
 local dk2, tt2 = spec.dk, "Select " .. spec.pick
-sbtn.MouseButton1Click:Connect(function() openBuyPicker(kk, tt2, dk2) end)
+local selBtn = spButton(buySec, bi * 2, "Select " .. spec.pick, "NONE", "", function()
+openBuyPicker(kk, tt2, dk2)
+end)
+buyLbls[kk] = selBtn
 end
 refreshBuyLbl()
 end
 print("[Velium Hub] Building INTERFACE accordion...")
-local ifInner = tabMisc:AddSection("INTERFACE", true):GetContainer()
+local ifSec = tabMisc:AddSection("INTERFACE", true)
 do
 local scaleNames = {"SMALL", "MEDIUM", "BIG", "MASSIVE"}
-local scaleBtns = {}
-for sIdx, sName in ipairs(scaleNames) do
-local isPicked = (cfg.uiScale == sName)
-local sb = UI:button(ifInner, sName, UDim2.new(1, 0, 0, 24), nil,
-(isPicked and T.SEL_BG) or T.BTN,
-(isPicked and T.SEL_TXT) or T.TEXT, 9)
-sb.LayoutOrder = sIdx
-sb.Font = Enum.Font.GothamBold
-UI:corner(sb, 5)
-UI:stroke(sb, (isPicked and T.ACCENT) or T.STROKE, 1)
-scaleBtns[sIdx] = sb
-local picked = sName
-sb.MouseButton1Click:Connect(function()
-cfg.uiScale = picked; saveConfig()
+spDropdown(ifSec, 1, "Interface Scale", "Resize the whole hub UI", false, scaleNames, {cfg.uiScale or "MEDIUM"}, function(v)
+cfg.uiScale = v[1] or "MEDIUM"; saveConfig()
 applyInterfaceScale()
-for j, other in ipairs(scaleBtns) do
-local on = (scaleNames[j] == picked)
-other.BackgroundColor3 = on and T.SEL_BG or T.BTN
-other.TextColor3 = on and T.SEL_TXT or T.TEXT
-local st = other:FindFirstChildOfClass("UIStroke")
-if st then st.Color = on and T.ACCENT or T.STROKE end
-end
 end)
-end
 end
 print("[Velium Hub] INTERFACE accordion built.")
 
@@ -3723,63 +3569,36 @@ print("[Velium Hub] INTERFACE accordion built.")
 -- WEBHOOK TAB
 -- ============================================================
 do
-local whScroll = tabWebhook:AddSection("WEBHOOK", true):GetContainer()
+local whSec = tabWebhook:AddSection("WEBHOOK", true)
 
--- Single accordion titled 🔗 WEBHOOK
-local whInner = whScroll
-
--- URL label
-local urlLbl = UI:label(whInner, "Webhook URL", UDim2.new(1,0,0,14), nil, T.DIM, 9)
-urlLbl.Font = Enum.Font.Gotham; urlLbl.LayoutOrder = 1
-
--- URL input row
-local urlRow = UI:frame(whInner, UDim2.new(1,0,0,30), nil, T.BTN)
-urlRow.LayoutOrder = 2
-UI:corner(urlRow, 6); UI:stroke(urlRow, T.STROKE, 1)
-local urlInp = UI:input(urlRow, cfg.webhook.url or "", "Paste Discord webhook URL...",
-	UDim2.new(1,0,1,0), nil)
-urlInp.TextColor3 = T.TEXT
-urlInp.ClearTextOnFocus = true
-urlInp.FocusLost:Connect(function() cfg.webhook.url = urlInp.Text; saveConfig() end)
-urlInp:GetPropertyChangedSignal("Text"):Connect(function() cfg.webhook.url = urlInp.Text; saveConfig() end)
+-- URL input
+spInput(whSec, 1, "Webhook URL", "Paste Discord webhook URL...", cfg.webhook.url or "", function(v)
+cfg.webhook.url = v; saveConfig()
+end)
 
 -- Continue Session toggle
-local contRow = UI:frame(whInner, UDim2.new(1,0,0,28), nil, T.BTN)
-contRow.LayoutOrder = 3
-UI:corner(contRow, 5); UI:stroke(contRow, T.STROKE, 1)
-UI:label(contRow, "🔄 Continue Session (after rejoin)", UDim2.new(1,-52,1,0), UDim2.new(0,10,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
-UI:toggle(contRow, UDim2.new(1,-48,0.5,-11), cfg.webhook.continueSession,
-	function(val) cfg.webhook.continueSession = val; saveConfig() end)
+spToggle(whSec, 3, "🔄 Continue Session (after rejoin)", "", cfg.webhook.continueSession, function(val)
+cfg.webhook.continueSession = val; saveConfig()
+end)
+
 -- Reset Session Data button
-local resetBtn = UI:button(whInner, "🔄 Reset Session Data", UDim2.new(1,0,0,30), nil, T.BTN, T.ERROR, 10)
-resetBtn.Font = Enum.Font.GothamBold
-UI:stroke(resetBtn, T.ERROR, 1)
-resetBtn.LayoutOrder = 4
-UI:corner(resetBtn, 6)
-resetBtn.MouseButton1Click:Connect(function()
-	cfg.webhook.sessionData = nil
-	cfg.webhook.lastCycle = nil
-	cfg.webhook.lastPet = nil
-	cfg.webhook.lastSync = nil
-	saveConfig()
-	resetBtn.Text = "✅ Session Data Reset!"
-	resetBtn.TextColor3 = T.SUCCESS
-	task.delay(2, function()
-		resetBtn.Text = "🔄 Reset Session Data"
-		resetBtn.TextColor3 = T.ERROR
-	end)
+local resetBtn = spButton(whSec, 4, "Reset Session Data", "Clear stored session + cycle data", "🔄", function()
+cfg.webhook.sessionData = nil
+cfg.webhook.lastCycle = nil
+cfg.webhook.lastPet = nil
+cfg.webhook.lastSync = nil
+saveConfig()
+resetBtn:Set("✅ Session Data Reset!", "Cleared")
+task.delay(2, function()
+resetBtn:Set("Reset Session Data", "Clear stored session + cycle data")
+end)
 end)
 
 -- Send Test button
-local testBtn = UI:button(whInner, "📡 Send Test", UDim2.new(1,0,0,30), nil, Color3.fromRGB(20,15,50), T.ACCENT, 10)
-testBtn.Font = Enum.Font.GothamBold
-UI:stroke(testBtn, T.ACCENT, 1)
-UI:corner(testBtn, 6)
-testBtn.LayoutOrder = 9
-testBtn.MouseButton1Click:Connect(function()
-	testBtn.Text = "Sending..."
-	sendTestWebhook()
-	task.delay(2, function() testBtn.Text = "📡 Send Test" end)
+local testBtn = spButton(whSec, 9, "Send Test", "Send a test embed to your webhook", "📡", function()
+testBtn:Set("Sending...", "")
+sendTestWebhook()
+task.delay(2, function() testBtn:Set("Send Test", "Send a test embed to your webhook") end)
 end)
 end
 
@@ -3794,155 +3613,44 @@ _G.HH_Shared.lvContainer = levelBox
 _G.HH_Shared.nmContainer = nightmareBox
 -- ============ AUTO ELEPHANT (moved from old ELEPHANT tab) ============
 do
-local function makeTeamDD(parent, label, configKey, order)
-local row = UI:frame(parent, UDim2.new(1,0,0,40), nil, T.BTN)
-row.LayoutOrder = order
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, label, UDim2.new(1,0,0,14), UDim2.new(0,0,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-local btn = UI:button(row, cfg.elephant[configKey] or "None selected",
-UDim2.new(1,-20,0,16), UDim2.new(0,0,1,-18), T.BTN, T.DIM, 8)
-btn.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(btn, 0,8,0,0)
-UI:stroke(btn, T.STROKE, 1)
-UI:label(row, "v", UDim2.new(0,20,0,16), UDim2.new(1,-20,1,-18), T.DIM, 8, Enum.TextXAlignment.Center)
-local listFrame = UI:frame(parent, UDim2.new(1,0,0,0), nil, T.BG)
-listFrame.LayoutOrder = order + 1
-listFrame.Visible = false; listFrame.AutomaticSize = Enum.AutomaticSize.Y
-UI:corner(listFrame, 5); UI:stroke(listFrame, T.STROKE, 1)
-local sf = UI:scroll(listFrame, UDim2.new(1,0,0,130))
-UI:list(sf, 2); UI:pad(sf, 2,2,2,2)
-local isOpen = false
-btn.MouseButton1Click:Connect(function()
-isOpen = not isOpen
-listFrame.Visible = isOpen
-if isOpen then
-buildTeamDD(sf, function(name)
-cfg.elephant[configKey] = name; saveConfig(); btn.Text = name
-listFrame.Visible = false; isOpen = false
-end, cfg.elephant[configKey], UI, cfg, T)
-end
+local eleSec = tabAuto:AddSection("AUTO ELEPHANT", true)
+local eleInner = eleSec:GetContainer()
+spTeamDD(eleSec, 1, "Select pet team for leveling 1-50", cfg.elephant, "levelingTeam")
+spTeamDD(eleSec, 4, "Select team for elephant", cfg.elephant, "elephantTeam")
+spToggle(eleSec, 10, "Level to 100 after target weight", "", cfg.elephant.levelTo100, function(val)
+cfg.elephant.levelTo100 = val; saveConfig()
 end)
-return btn
-end
-
--- FIX: Renamed the second function to makeToggleRow so it doesn't break makeNumInput
-local function makeToggleRow(parent, label, configKey, defaultVal, order)
-local row = UI:frame(parent, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = order
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, label, UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.elephant[configKey] or false,
-function(val) cfg.elephant[configKey] = val; saveConfig() end)
-return row
-end
-
-local function makeNumInput(parent, label, configKey, defaultVal, order)
-local row = UI:frame(parent, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = order
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, label, UDim2.new(1,-72,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.elephant[configKey] or defaultVal), "",
-UDim2.new(0,64,0,20), UDim2.new(1,-68,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
-if val and val > 0 then cfg.elephant[configKey] = val; saveConfig()
-else inp.Text = tostring(cfg.elephant[configKey] or defaultVal) end
+do
+local opts = {"1 Pet", "2 Pets", "3 Pets"}
+local keyOf = {["1 Pet"]="1",["2 Pets"]="2",["3 Pets"]="3"}
+local nameOf = {["1"]="1 Pet",["2"]="2 Pets",["3"]="3 Pets"}
+local cur = nameOf[tostring(cfg.elephant.gardenSlots or 1)] or "1 Pet"
+spDropdown(eleSec, 11, "Target in Garden", "Berapa pet target diproses sekaligus", false, opts, {cur}, function(v)
+cfg.elephant.gardenSlots = tonumber(keyOf[v[1]] or "1"); saveConfig()
 end)
-return inp
-end
-local function makeNumInput(parent, label, configKey, defaultVal, order)
-local row = UI:frame(parent, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = order
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, label, UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.Gotham
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.elephant[configKey] or false,
-function(val) cfg.elephant[configKey] = val; saveConfig() end)
-return row
-end
-local function makeModeRow(parent, label, configKey, optA, optB, order)
-local row = UI:frame(parent, UDim2.new(1,0,0,26), nil, T.BTN, order)
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, label, UDim2.new(1,-120,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local btnA = UI:button(row, optA.name, UDim2.new(0,56,0,20), UDim2.new(1,-118,0.5,-10), T.BTN, T.DIM, 8)
-UI:stroke(btnA, T.STROKE, 1)
-local btnB = UI:button(row, optB.name, UDim2.new(0,56,0,20), UDim2.new(1,-58,0.5,-10), T.BTN, T.DIM, 8)
-UI:stroke(btnB, T.STROKE, 1)
-local function refresh()
-local cur = cfg.elephant[configKey]
-if cur == optA.key then
-btnA.BackgroundColor3 = T.SEL_BG; btnA.TextColor3 = T.SEL_TXT; UI:stroke(btnA, T.ACCENT, 1)
-btnB.BackgroundColor3 = T.BTN; btnB.TextColor3 = T.DIM; UI:stroke(btnB, T.STROKE, 1)
-else
-btnB.BackgroundColor3 = T.SEL_BG; btnB.TextColor3 = T.SEL_TXT; UI:stroke(btnB, T.ACCENT, 1)
-btnA.BackgroundColor3 = T.BTN; btnA.TextColor3 = T.DIM; UI:stroke(btnA, T.STROKE, 1)
-end
-end
-btnA.MouseButton1Click:Connect(function() cfg.elephant[configKey] = optA.key; saveConfig(); refresh() end)
-btnB.MouseButton1Click:Connect(function() cfg.elephant[configKey] = optB.key; saveConfig(); refresh() end)
-refresh()
-return row
-end
-local eleInner = tabAuto:AddSection("AUTO ELEPHANT", true):GetContainer()
-makeTeamDD(eleInner, "Select pet team for leveling 1-50", "levelingTeam", 1)
-makeTeamDD(eleInner, "Select team for elephant", "elephantTeam", 4)
-do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 10
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Level to 100 after target weight", UDim2.new(1,-52,1,0), UDim2.new(0,4,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.elephant.levelTo100,
-function(val) cfg.elephant.levelTo100 = val; saveConfig() end)
 end
 do
-local picker = UI:modePickerRow(eleInner, {
-label = "Target in Garden",
-overlayParent = modalRoot,
-modes = {
-{key = "1", name = "1 Pet", desc = "Proses 1 pet target di garden sekaligus"},
-{key = "2", name = "2 Pets", desc = "Proses 2 pet target di garden sekaligus"},
-{key = "3", name = "3 Pets", desc = "Proses 3 pet target di garden sekaligus"},
-},
-default = tostring(cfg.elephant.gardenSlots or 1),
-onSelect = function(val) cfg.elephant.gardenSlots = tonumber(val); saveConfig() end
-})
-picker.row.LayoutOrder = 11
+local opts = {"Mode A - All Target", "Mode B - One By one"}
+local keyOf = {["Mode A - All Target"]="A",["Mode B - One By one"]="B"}
+local nameOf = {A="Mode A - All Target", B="Mode B - One By one"}
+local cur = nameOf[cfg.elephant.gardenMode or "A"] or "Mode A - All Target"
+spDropdown(eleSec, 12, "Garden Mode", "Cara equip target pet", false, opts, {cur}, function(v)
+cfg.elephant.gardenMode = keyOf[v[1]] or "A"; saveConfig()
+end)
 end
-do
-local picker = UI:modePickerRow(eleInner, {
-label = "Garden Mode",
-overlayParent = modalRoot,
-modes = {
-{key = "A", name = "Mode A - All Target", desc = "Semua Target pet di-equip bareng elephant team. Tunggu SEMUA naik baru balik ke leveling."},
-{key = "B", name = "Mode B - One By one", desc = "Pet 1 + elephant team naik, lalu Pet 2 + elephant team naik. Baru balik ke leveling."},
-},
-default = cfg.elephant.gardenMode or "A",
-onSelect = function(val) cfg.elephant.gardenMode = val; saveConfig() end
-})
-picker.row.LayoutOrder = 12
-end
-do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 13
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Extra Filler Pets (swap saat capai threshold)", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.elephant.useExtraPets or false,
-function(val) cfg.elephant.useExtraPets = val; saveConfig() end)
-end
+spToggle(eleSec, 13, "Extra Filler Pets (swap saat capai threshold)", "", cfg.elephant.useExtraPets or false, function(val)
+cfg.elephant.useExtraPets = val; saveConfig()
+end)
 local efCountLbl
 do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,22), nil, T.BTN)
-row.LayoutOrder = 14
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-efCountLbl = UI:label(row, "Extra pets: NONE", UDim2.new(1,-90,1,0), UDim2.new(0,4,0,0), T.DIM, 9)
-efCountLbl.Font = Enum.Font.Gotham
-local sb = UI:button(row, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(sb, T.STROKE, 1)
+local efOpen
 local function efUpdate()
 local n = 0; for _ in pairs(cfg.elephant.extraPets) do n = n + 1 end
-if n == 0 then efCountLbl.Text = "Extra pets: NONE"; efCountLbl.TextColor3 = T.DIM
-else efCountLbl.Text = "Extra pets: " .. n .. " selected"; efCountLbl.TextColor3 = T.ACCENT end
+local txt = n == 0 and "NONE" or (n .. " selected")
+efCountLbl:Set("Select Extra Filler Pets", txt)
+efCountLbl.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
 end
-efUpdate()
+efCountLbl = spButton(eleSec, 14, "Select Extra Filler Pets", "NONE", "", function() if efOpen then efOpen() end end)
 local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 ov.Visible = false; ov.ZIndex = 20
 local oh = UI:frame(ov, UDim2.new(1,0,0,26), nil, T.PANEL)
@@ -3977,31 +3685,22 @@ saveConfig(); efUpdate(); rebuild() end)
 n = n + 1 end
 end
 oSearch:GetPropertyChangedSignal("Text"):Connect(rebuild)
-sb.MouseButton1Click:Connect(function() ov.Visible = true; rebuild() end)
+efOpen = function() ov.Visible = true; rebuild() end
+efUpdate()
 end
-do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 15
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Extra Ele Filler Pets (swap saat capai target KG)", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.elephant.useExtraElePets or false,
-function(val) cfg.elephant.useExtraElePets = val; saveConfig() end)
-end
+spToggle(eleSec, 15, "Extra Ele Filler Pets (swap saat capai target KG)", "", cfg.elephant.useExtraElePets or false, function(val)
+cfg.elephant.useExtraElePets = val; saveConfig()
+end)
 local eefCountLbl
 do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,22), nil, T.BTN)
-row.LayoutOrder = 16
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-eefCountLbl = UI:label(row, "Extra ele pets: NONE", UDim2.new(1,-90,1,0), UDim2.new(0,4,0,0), T.DIM, 9)
-eefCountLbl.Font = Enum.Font.Gotham
-local sb = UI:button(row, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(sb, T.STROKE, 1)
+local eefOpen
 local function eefUpdate()
 local n = 0; for _ in pairs(cfg.elephant.extraElePets) do n = n + 1 end
-if n == 0 then eefCountLbl.Text = "Extra ele pets: NONE"; eefCountLbl.TextColor3 = T.DIM
-else eefCountLbl.Text = "Extra ele pets: " .. n .. " selected"; eefCountLbl.TextColor3 = T.ACCENT end
+local txt = n == 0 and "NONE" or (n .. " selected")
+eefCountLbl:Set("Select Extra Ele Filler Pets", txt)
+eefCountLbl.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
 end
-eefUpdate()
+eefCountLbl = spButton(eleSec, 16, "Select Extra Ele Filler Pets", "NONE", "", function() if eefOpen then eefOpen() end end)
 local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 ov.Visible = false; ov.ZIndex = 20
 local oh = UI:frame(ov, UDim2.new(1,0,0,26), nil, T.PANEL)
@@ -4036,62 +3735,46 @@ saveConfig(); eefUpdate(); rebuild() end)
 n = n + 1 end
 end
 oSearch2:GetPropertyChangedSignal("Text"):Connect(rebuild)
-sb.MouseButton1Click:Connect(function() ov.Visible = true; rebuild() end)
+eefOpen = function() ov.Visible = true; rebuild() end
+eefUpdate()
 end
+spToggle(eleSec, 20, "[ Optional ] Phase 2 team (X - 100)", "", cfg.elephant.phase2Enabled, function(val)
+cfg.elephant.phase2Enabled = val; saveConfig()
+end)
+spTeamDD(eleSec, 23, "Select phase 2 team (after target weight)", cfg.elephant, "phase2Team")
 do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 20
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "[ Optional ] Phase 2 team (X - 100)", UDim2.new(1,-52,1,0), UDim2.new(0,4,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.elephant.phase2Enabled,
-function(val) cfg.elephant.phase2Enabled = val; saveConfig() end)
-end
-makeTeamDD(eleInner, "Select phase 2 team (after target weight)", "phase2Team", 23)
-do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 26
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Use phase 2 team from level", UDim2.new(1,-72,1,0), UDim2.new(0,4,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.elephant.phase2Threshold), "", UDim2.new(0,64,0,20), UDim2.new(1,-68,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
+local p2Inp
+p2Inp = spInput(eleSec, 26, "Use phase 2 team from level", "", tostring(cfg.elephant.phase2Threshold), function(v)
+local val = tonumber(v)
 if val and val >= 1 then cfg.elephant.phase2Threshold = val; saveConfig()
-else inp.Text = tostring(cfg.elephant.phase2Threshold) end
+elseif p2Inp then p2Inp:Set(tostring(cfg.elephant.phase2Threshold)) end
 end)
 end
 do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 30
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Target KG", UDim2.new(1,-72,1,0), UDim2.new(0,4,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.elephant.targetWeight), "", UDim2.new(0,64,0,20), UDim2.new(1,-68,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
+local twInp
+twInp = spInput(eleSec, 30, "Target KG", "Berat target sebelum balik ke leveling", tostring(cfg.elephant.targetWeight), function(v)
+local val = tonumber(v)
 if val and val > 0 then cfg.elephant.targetWeight = val; saveConfig()
-else inp.Text = tostring(cfg.elephant.targetWeight) end
+elseif twInp then twInp:Set(tostring(cfg.elephant.targetWeight)) end
 end)
 end
 do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 33
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Max Level (P1 switch)", UDim2.new(1,-72,1,0), UDim2.new(0,4,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.elephant.levelThreshold), "", UDim2.new(0,64,0,20), UDim2.new(1,-68,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
+local mlInp
+mlInp = spInput(eleSec, 33, "Max Level (P1 switch)", "", tostring(cfg.elephant.levelThreshold), function(v)
+local val = tonumber(v)
 if val and val >= 1 then cfg.elephant.levelThreshold = val; saveConfig()
-else inp.Text = tostring(cfg.elephant.levelThreshold) end
+elseif mlInp then mlInp:Set(tostring(cfg.elephant.levelThreshold)) end
 end)
 end
 local tgtCountLabel
+local function setTgtCount()
+local n = #cfg.targets
+tgtCountLabel:Set("Select Target Pets", "Target pets: " .. n)
+tgtCountLabel.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
+end
 do
-local row = UI:frame(eleInner, UDim2.new(1,0,0,22), nil, T.BTN)
-row.LayoutOrder = 36
-UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-tgtCountLabel = UI:label(row, "Target pets: " .. #cfg.targets, UDim2.new(1,-70,1,0), UDim2.new(0,4,0,0), T.DIM, 9)
-tgtCountLabel.Font = Enum.Font.Gotham
-local sb = UI:button(row, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(sb, T.STROKE, 1)
+local tgtOpen
+tgtCountLabel = spButton(eleSec, 36, "Select Target Pets", "Target pets: 0", "", function() if tgtOpen then tgtOpen() end end)
 local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 ov.Visible = false; ov.ZIndex = 20
 local oh = UI:frame(ov, UDim2.new(1,0,0,26), nil, T.PANEL)
@@ -4101,7 +3784,7 @@ local sa = UI:button(oh, "Select All", UDim2.new(0,64,0,20), UDim2.new(1,-118,0.
 UI:stroke(sa, T.STROKE, 1)
 local ox = UI:button(oh, "X", UDim2.new(0,24,0,20), UDim2.new(1,-28,0.5,-10), T.ERROR, T.TEXT, 10)
 UI:stroke(ox, T.ERROR, 1)
-ox.MouseButton1Click:Connect(function() ov.Visible = false; tgtCountLabel.Text = "Target pets: " .. #cfg.targets end)
+ox.MouseButton1Click:Connect(function() ov.Visible = false; setTgtCount() end)
 local oSearch3 = UI:input(ov, "", "Search pet name...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,28))
 oSearch3.TextColor3 = T.TEXT; oSearch3.Font = Enum.Font.Gotham
 local ofr = UI:scroll(ov, UDim2.new(1,0,1,-56), UDim2.new(0,0,0,54))
@@ -4131,7 +3814,7 @@ UI:pad(b,0,8,4,0); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
 b.MouseButton1Click:Connect(function()
 local i = table.find(cfg.targets, uuid)
 if i then table.remove(cfg.targets, i) else table.insert(cfg.targets, uuid) end
-saveConfig(); tgtCountLabel.Text = "Target pets: " .. #cfg.targets; rebuild() end)
+saveConfig(); setTgtCount(); rebuild() end)
 n = n + 1 end
 end
 sa.MouseButton1Click:Connect(function()
@@ -4148,10 +3831,11 @@ if pet and (q == "" or string.lower(pet.PetType or ""):find(q,1,true)) then
 if not table.find(cfg.targets, uuid) then table.insert(cfg.targets, uuid) end
 end end
 end
-saveConfig(); tgtCountLabel.Text = "Target pets: " .. #cfg.targets; rebuild()
+saveConfig(); setTgtCount(); rebuild()
 end)
 oSearch3:GetPropertyChangedSignal("Text"):Connect(rebuild)
-sb.MouseButton1Click:Connect(function() ov.Visible = true; rebuild() end)
+tgtOpen = function() ov.Visible = true; rebuild() end
+setTgtCount()
 end
 local logScroll, logCount, doneCount, doneLabel
 do
@@ -4429,7 +4113,7 @@ status(string.format("%s done!", petName), T.SUCCESS)
 pcall(function() sendPetFinishedWebhook(petName, getBase(uuid), os.clock() - startTime, 0, doneCount, totalPets) end)
 local idx2 = table.find(cfg.targets, uuid)
 if idx2 then table.remove(cfg.targets, idx2) end
-if tgtCountLabel then tgtCountLabel.Text = tostring(#cfg.targets) end
+if tgtCountLabel then setTgtCount() end
 else
 log(string.format(" P2: %s lvl 100", petName), T.ACCENT)
 status(string.format("P2 Lv%d/100 | %s", getAge(uuid), petName), T.ACCENT)
@@ -4456,7 +4140,7 @@ pcall(function() sendPetFinishedWebhook(petName, getBase(uuid), os.clock() - sta
 status(string.format("%s done!", petName), T.SUCCESS)
 local idx2 = table.find(cfg.targets, uuid)
 if idx2 then table.remove(cfg.targets, idx2) end
-if tgtCountLabel then tgtCountLabel.Text = tostring(#cfg.targets) end
+if tgtCountLabel then setTgtCount() end
 break
 end
 end
@@ -4497,50 +4181,26 @@ task.defer(function() startAutoKG(kgToggle, statusFn, logFn, doneLabel) end)
 end
 end
 -- ============ AUTO MUTATIONS (order 4) ============
-local mutInner = tabAuto:AddSection("AUTO MUTATIONS", false):GetContainer()
+local mutSec = tabAuto:AddSection("AUTO MUTATIONS", false)
+local mutInner = mutSec:GetContainer()
+spToggle(mutSec, 1, "Enable Auto Mutation", "", cfg.toggles.autoMutation, function(val)
+cfg.toggles.autoMutation = val; saveConfig(); VeliumNotify("Auto Mutation", val)
+end)
 do
-local row = UI:frame(mutInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 1; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Enable Auto Mutation", UDim2.new(1,-48,1,0), UDim2.new(0,6,0,0), T.TEXT, 9)
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.toggles.autoMutation,
-function(val) cfg.toggles.autoMutation = val; saveConfig(); VeliumNotify("Auto Mutation", val) end)
-end
-do
-local row = UI:frame(mutInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 2; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Method", UDim2.new(0,50,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
 local methods = { "Level", "Nightmare", "Venom", "Ember", "Everchanted" }
-local methodBtn = UI:button(row, cfg.autoMutation.method or "Level",
-UDim2.new(0,90,0,20), UDim2.new(0,56,0.5,-10), T.BTN, T.TEXT, 9)
-UI:stroke(methodBtn, T.STROKE, 1)
-local methodOv = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-methodOv.Visible = false; methodOv.ZIndex = 25
-local methodBar = UI:frame(methodOv, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(methodBar, T.STROKE, 1)
-UI:label(methodBar, "Select Method", UDim2.new(1,-30,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local methodX = UI:button(methodBar, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(methodX, T.ERROR, 1)
-methodX.MouseButton1Click:Connect(function() methodOv.Visible = false end)
-local methodSF = UI:scroll(methodOv, UDim2.new(1,0,1,-36), UDim2.new(0,0,0,32))
-UI:list(methodSF, 3); UI:pad(methodSF, 3,4,4,3)
-for _, m in ipairs(methods) do
-local isSel = cfg.autoMutation.method == m
-local b = UI:button(methodSF, m, UDim2.new(1,0,0,26), nil,
-isSel and T.SEL_BG or Color3.fromRGB(13,13,13), isSel and T.SEL_TXT or T.TEXT, 9)
-UI:corner(b, 5); UI:stroke(b, isSel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-cfg.autoMutation.method = m; saveConfig(); methodBtn.Text = m
-methodOv.Visible = false
+spDropdown(mutSec, 2, "Method", "Mutation method", false, methods, {cfg.autoMutation.method or "Level"}, function(v)
+cfg.autoMutation.method = v[1] or "Level"; saveConfig()
 end)
 end
-methodBtn.MouseButton1Click:Connect(function() methodOv.Visible = true end)
+local mutPetBtn
+local function updateMutPetBtn()
+local uuid = cfg.autoMutation.targetUUID
+local p = uuid and getInventory()[uuid]
+mutPetBtn:Set("Target Pet", (p and ((p.PetType or "?"):sub(1,15) .. "...")) or "Select >")
 end
 do
-local row = UI:frame(mutInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 3; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Target Pet", UDim2.new(0,60,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local petBtn = UI:button(row, "Select >", UDim2.new(0,70,0,20), UDim2.new(1,-76,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(petBtn, T.STROKE, 1)
+local mutPetOpen
+mutPetBtn = spButton(mutSec, 3, "Target Pet", "Select >", "", function() if mutPetOpen then mutPetOpen() end end)
 local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 ov.Visible = false; ov.ZIndex = 25
 local bar2 = UI:frame(ov, UDim2.new(1,0,0,30), nil, T.PANEL)
@@ -4575,7 +4235,7 @@ b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
 UI:pad(b,0,8,2,0); UI:corner(b,5); UI:stroke(b, isSel and T.ACCENT or T.STROKE, 1)
 b.MouseButton1Click:Connect(function()
 cfg.autoMutation.targetUUID = uuid; saveConfig()
-petBtn.Text = name:sub(1, 15) .. "..."
+updateMutPetBtn()
 ov.Visible = false
 end)
 n = n + 1
@@ -4583,68 +4243,45 @@ end
 end
 xBtn.MouseButton1Click:Connect(function() ov.Visible = false end)
 search:GetPropertyChangedSignal("Text"):Connect(rebuildPetList)
-petBtn.MouseButton1Click:Connect(function()
+mutPetOpen = function()
 ov.Visible = true
-if cfg.autoMutation.targetUUID then
-local p = getInventory()[cfg.autoMutation.targetUUID]
-if p then petBtn.Text = (p.PetType or "?"):sub(1, 15) .. "..." end
-end
+updateMutPetBtn()
 rebuildPetList()
-end)
+end
 end
 do
-local row = UI:frame(mutInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 4; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Target Age", UDim2.new(0,70,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.autoMutation.targetAge or 100), "",
-UDim2.new(0,50,0,20), UDim2.new(0,76,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
+local taInp
+taInp = spInput(mutSec, 4, "Target Age", "", tostring(cfg.autoMutation.targetAge or 100), function(v)
+local val = tonumber(v)
 if val and val >= 1 then cfg.autoMutation.targetAge = val; saveConfig()
-else inp.Text = tostring(cfg.autoMutation.targetAge or 100) end
+elseif taInp then taInp:Set(tostring(cfg.autoMutation.targetAge or 100)) end
 end)
 end
+spInput(mutSec, 5, "Target Mut", "Mutasi target", cfg.autoMutation.targetMutant or "Normal", function(v)
+cfg.autoMutation.targetMutant = v; saveConfig()
+end)
 do
-local row = UI:frame(mutInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 5; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Target Mut", UDim2.new(0,70,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, cfg.autoMutation.targetMutant or "Normal", "",
-UDim2.new(1,-80,0,20), UDim2.new(0,76,0.5,-10))
-inp.FocusLost:Connect(function() cfg.autoMutation.targetMutant = inp.Text; saveConfig() end)
-end
-do
-local row = UI:frame(mutInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 6; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Farm/Tim/Claim", UDim2.new(0,80,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local function makeLoadoutBtn(label, default, xOff, configKey)
-UI:label(row, label, UDim2.new(0,30,1,0), UDim2.new(0,xOff,0,0), T.DIM, 8).Font = Enum.Font.Gotham
-local btn = UI:button(row, tostring(default),
-UDim2.new(0,24,0,20), UDim2.new(0,xOff+30,0.5,-10), T.BTN, T.TEXT, 9)
-UI:stroke(btn, T.STROKE, 1)
-btn.MouseButton1Click:Connect(function()
-local cur = tonumber(btn.Text) or 1
+local function makeLoadoutBtn(label, configKey, order)
+local btn
+btn = spButton(mutSec, order, label, tostring(cfg.autoMutation[configKey] or 1), "", function()
+local cur = tonumber(btn.Content.Text) or 1
 cur = cur + 1
 if cur > 6 then cur = 1 end
 cfg.autoMutation[configKey] = cur
-btn.Text = tostring(cur)
+btn:Set(nil, tostring(cur))
 saveConfig()
 end)
-return btn
 end
-makeLoadoutBtn("Farm", cfg.autoMutation.farmLoadout or 1, 90, "farmLoadout")
-makeLoadoutBtn("Tim", cfg.autoMutation.timeLoadout or 2, 150, "timeLoadout")
-makeLoadoutBtn("Clm", cfg.autoMutation.claimLoadout or 3, 210, "claimLoadout")
+makeLoadoutBtn("Farm Loadout", "farmLoadout", 6)
+makeLoadoutBtn("Tim Loadout", "timeLoadout", 7)
+makeLoadoutBtn("Claim Loadout", "claimLoadout", 8)
 end
 do
-local row = UI:frame(mutInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 7; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Delay (s)", UDim2.new(0,60,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local inp = UI:input(row, tostring(cfg.autoMutation.delay or 10), "",
-UDim2.new(0,40,0,20), UDim2.new(0,66,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
+local dlInp
+dlInp = spInput(mutSec, 9, "Delay (s)", "Delay antar mutasi", tostring(cfg.autoMutation.delay or 10), function(v)
+local val = tonumber(v)
 if val and val >= 1 then cfg.autoMutation.delay = val; saveConfig()
-else inp.Text = tostring(cfg.autoMutation.delay or 10) end
+elseif dlInp then dlInp:Set(tostring(cfg.autoMutation.delay or 10)) end
 end)
 end
 local function getPetData()
@@ -4728,22 +4365,19 @@ end
 end
 end)
 -- ============ AUTO GIFT PET (order 5) ============
-local giftInner = tabAuto:AddSection("AUTO GIFT PET", false):GetContainer()
-do
-local row = UI:frame(giftInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 1; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Enable Auto Gift", UDim2.new(1,-48,1,0), UDim2.new(0,6,0,0), T.TEXT, 9)
-UI:toggle(row, UDim2.new(1,-48,0.5,-11), cfg.toggles.autoGift,
-function(val) cfg.toggles.autoGift = val; saveConfig(); VeliumNotify("Auto Gift", val) end)
+local giftSec = tabAuto:AddSection("AUTO GIFT PET", false)
+local giftInner = giftSec:GetContainer()
+spToggle(giftSec, 1, "Enable Auto Gift", "", cfg.toggles.autoGift, function(val)
+cfg.toggles.autoGift = val; saveConfig(); VeliumNotify("Auto Gift", val)
+end)
+local friendBtn
+local function updateFriendBtn()
+local n = cfg.autoGift.friendName
+friendBtn:Set("Friend", (n and n ~= "" and ("@" .. n)) or "Select Player")
 end
 do
-local row = UI:frame(giftInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 2; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Friend", UDim2.new(0,50,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local friendBtn = UI:button(row, cfg.autoGift.friendName ~= "" and cfg.autoGift.friendName or "Select Player",
-UDim2.new(1,-56,0,20), UDim2.new(0,56,0.5,-10), T.BTN, T.TEXT, 9)
-friendBtn.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(friendBtn, 0, 8, 0, 0); UI:stroke(friendBtn, T.STROKE, 1)
+local friendOpen
+friendBtn = spButton(giftSec, 2, "Friend", "Select Player", "", function() if friendOpen then friendOpen() end end)
 local friendOv = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 friendOv.Visible = false; friendOv.ZIndex = 25
 local friendBar = UI:frame(friendOv, UDim2.new(1,0,0,30), nil, T.PANEL)
@@ -4768,26 +4402,26 @@ b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
 UI:pad(b,0,8,2,0); UI:corner(b,5); UI:stroke(b, isSel and T.ACCENT or T.STROKE, 1)
 b.MouseButton1Click:Connect(function()
 cfg.autoGift.friendName = plr.Name; saveConfig()
-friendBtn.Text = "@" .. plr.Name
+updateFriendBtn()
 friendOv.Visible = false
 end)
 end
 end
 end
-friendBtn.MouseButton1Click:Connect(function()
+friendOpen = function()
 friendOv.Visible = true
 rebuildFriendList()
-end)
+end
+end
+local giftPetsBtn
+local function updateGiftPetsBtn()
+local c = 0; for _ in pairs(cfg.autoGift.petTypes or {}) do c = c + 1 end
+giftPetsBtn:Set("Pets to Gift", c == 0 and "None" or (c .. " selected"))
+giftPetsBtn.Content.TextColor3 = c == 0 and T.DIM or T.ACCENT
 end
 do
-local row = UI:frame(giftInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 3; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-local selCount = 0
-for _ in pairs(cfg.autoGift.petTypes or {}) do selCount = selCount + 1 end
-local lbl = UI:label(row, "Pets: " .. (selCount == 0 and "None" or selCount .. " selected"),
-UDim2.new(1,-90,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
-local btn = UI:button(row, "Select >", UDim2.new(0,70,0,20), UDim2.new(1,-76,0.5,-10), T.BTN, T.ACCENT, 9)
-UI:stroke(btn, T.STROKE, 1)
+local giftOpen
+giftPetsBtn = spButton(giftSec, 3, "Pets to Gift", "None", "", function() if giftOpen then giftOpen() end end)
 local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 ov.Visible = false; ov.ZIndex = 25
 local bar3 = UI:frame(ov, UDim2.new(1,0,0,30), nil, T.PANEL)
@@ -4797,8 +4431,7 @@ local xBtn = UI:button(bar3, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11)
 UI:stroke(xBtn, T.ERROR, 1)
 xBtn.MouseButton1Click:Connect(function()
 ov.Visible = false
-local c = 0; for _ in pairs(cfg.autoGift.petTypes or {}) do c = c + 1 end
-lbl.Text = c == 0 and "Pets: None" or ("Pets: " .. c .. " selected")
+updateGiftPetsBtn()
 end)
 local search = UI:input(ov, "", "Search pet..", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
 search.TextColor3 = T.TEXT; search.Font = Enum.Font.Gotham
@@ -4825,25 +4458,19 @@ end)
 end
 end
 search:GetPropertyChangedSignal("Text"):Connect(rebuildGiftList)
-btn.MouseButton1Click:Connect(function() ov.Visible = true; rebuildGiftList() end)
+giftOpen = function() ov.Visible = true; rebuildGiftList() end
 end
 do
-local row = UI:frame(giftInner, UDim2.new(1,0,0,26), nil, T.BTN)
-row.LayoutOrder = 4; UI:corner(row, 5); UI:stroke(row, T.STROKE, 1)
-UI:label(row, "Weight", UDim2.new(0,50,1,0), UDim2.new(0,6,0,0), T.DIM, 9).Font = Enum.Font.Gotham
-local modeBtn = UI:button(row, cfg.autoGift.weightMode or "Below",
-UDim2.new(0,60,0,20), UDim2.new(0,56,0.5,-10), T.BTN, T.TEXT, 9)
-UI:stroke(modeBtn, T.STROKE, 1)
-modeBtn.MouseButton1Click:Connect(function()
+local wmBtn
+wmBtn = spButton(giftSec, 4, "Weight Mode", cfg.autoGift.weightMode or "Below", "", function()
 cfg.autoGift.weightMode = cfg.autoGift.weightMode == "Below" and "Above" or "Below"
-modeBtn.Text = cfg.autoGift.weightMode; saveConfig()
+wmBtn:Set(nil, cfg.autoGift.weightMode); saveConfig()
 end)
-local inp = UI:input(row, tostring(cfg.autoGift.weightThreshold or 0), "",
-UDim2.new(0,50,0,20), UDim2.new(0,122,0.5,-10))
-inp.FocusLost:Connect(function()
-local val = tonumber(inp.Text)
+local wtInp
+wtInp = spInput(giftSec, 5, "Weight Threshold", "Batas berat untuk gift", tostring(cfg.autoGift.weightThreshold or 0), function(v)
+local val = tonumber(v)
 if val and val >= 0 then cfg.autoGift.weightThreshold = val; saveConfig()
-else inp.Text = tostring(cfg.autoGift.weightThreshold or 0) end
+elseif wtInp then wtInp:Set(tostring(cfg.autoGift.weightThreshold or 0)) end
 end)
 end
 local function runGift()
@@ -4929,6 +4556,8 @@ _G.HH_Shared.outerScroll = levelBox
 if not (gotL and gotN) then
 	warn("[Velium Hub] Some modules unavailable -> accordions may not appear.")
 end
+-- Refresh team dropdowns now that external modules may have registered built-in teams
+pcall(refreshTeamDropdowns)
 end
 -- ======================== PET BOOST LOOP ========================
 task.spawn(function()
@@ -4969,4 +4598,4 @@ end)
 end
 end)
 notifyReady = true
-print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed2.", os.clock() - tStart, VELIUM_BUILD))
+print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed3.", os.clock() - tStart, VELIUM_BUILD))

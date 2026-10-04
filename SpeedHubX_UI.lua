@@ -1134,7 +1134,7 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.935,
           BorderColor3 = Color3.fromRGB(0, 0, 0),
           BorderSizePixel = 0,
-          LayoutOrder = ItemCount,
+          LayoutOrder = Config.LayoutOrder or ItemCount,
           Size = UDim2.new(1, 0, 0, 35),
           Name = "Paragraph",
         }, SectionAdd)
@@ -1187,15 +1187,23 @@ function Speed_Library:CreateWindow(Config)
 
         ParagraphContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateParagraphSize)
 
-        function SettingFuncs:Set(Config)
-          local Title = Config[1] or Config.Title or ""
-          local Content = Config[2] or Config.Content or ""
+        function SettingFuncs:Set(a, b)
+          local Title, Content
+          if type(a) == "table" then
+            Title = a[1] or a.Title or ""
+            Content = a[2] or a.Content or ""
+          else
+            Title = a or ""
+            Content = b or ""
+          end
 
           ParagraphTitle.Text = Title
           ParagraphContent.Text = Content
 
           UpdateParagraphSize()
         end
+        SettingFuncs.Title = ParagraphTitle
+        SettingFuncs.Content = ParagraphContent
 
         return SettingFuncs
       end
@@ -1209,7 +1217,7 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.1,
           BorderColor3 = Color3.fromRGB(0, 0, 0),
           BorderSizePixel = 1,
-          LayoutOrder = ItemCount,
+          LayoutOrder = Config.LayoutOrder or ItemCount,
           Size = UDim2.new(1, 0, 0, 30),
           Name = "Seperator",
         }, SectionAdd)
@@ -1291,7 +1299,7 @@ function Speed_Library:CreateWindow(Config)
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 					BackgroundTransparency = 0.935,
 					BorderSizePixel = 0,
-					LayoutOrder = ItemCount,
+					LayoutOrder = Config.LayoutOrder or ItemCount,
 					Size = UDim2.new(1, 0, 0, 35)
 				}, SectionAdd)
 
@@ -1299,7 +1307,7 @@ function Speed_Library:CreateWindow(Config)
           CornerRadius = UDim.new(0, 4)
         }, Button)
 
-        Custom:Create("TextLabel", {
+        local ButtonTitle = Custom:Create("TextLabel", {
 					Name = "ButtonTitle",
 					Font = Enum.Font.GothamBold,
 					Text = Title,
@@ -1369,22 +1377,51 @@ function Speed_Library:CreateWindow(Config)
 					Size = UDim2.new(0, 25, 0, 25)
 				}, Button)
 
-        Custom:Create("ImageLabel", {
-          Name = "FeatureImg",
-          Image = Icon,
-          AnchorPoint = Vector2.new(0.5, 0.5),
-          BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-          BackgroundTransparency = 0.999,
-          BorderSizePixel = 0,
-          Position = UDim2.new(0.5, 0, 0.5, 0),
-          Size = UDim2.new(1, 0, 1, 0)
-        }, FeatureFrame1)
+        -- Velium: support emoji / text icons on buttons, not only image assets
+        if Icon ~= "" and not string.find(Icon, "rbxassetid") and not string.find(Icon, "http") then
+          Custom:Create("TextLabel", {
+            Name = "FeatureImg",
+            Text = Icon,
+            Font = Enum.Font.GothamBold,
+            TextColor3 = Color3.fromRGB(231, 231, 231),
+            TextSize = 16,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.new(1, 0, 1, 0),
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextYAlignment = Enum.TextYAlignment.Center
+          }, FeatureFrame1)
+        else
+          Custom:Create("ImageLabel", {
+            Name = "FeatureImg",
+            Image = Icon,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundTransparency = 0.999,
+            BorderSizePixel = 0,
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.new(1, 0, 1, 0)
+          }, FeatureFrame1)
+        end
 
         ButtonButton.Activated:Connect(function()
 					CircleClick(ButtonButton, Player:GetMouse().X, Player:GetMouse().Y)
 
 					Callback()
 				end)
+
+        -- Velium: allow dynamic title/content updates from call sites
+        function Funcs_Button:Set(NewTitle, NewContent)
+          if NewTitle ~= nil then ButtonTitle.Text = tostring(NewTitle) end
+          if NewContent ~= nil then ButtonContent.Text = tostring(NewContent) end
+          UpdateButtonSize()
+        end
+        Funcs_Button.Title = ButtonTitle
+        Funcs_Button.Content = ButtonContent
+        Funcs_Button.Frame = Button
+        Funcs_Button.ButtonButton = ButtonButton
 
         ItemCount += 1
 				return Funcs_Button
@@ -1403,7 +1440,7 @@ function Speed_Library:CreateWindow(Config)
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 					BackgroundTransparency = 0.935,
 					BorderSizePixel = 0,
-					LayoutOrder = ItemCount,
+					LayoutOrder = Config.LayoutOrder or ItemCount,
 					Size = UDim2.new(1, 0, 0, 35)
 				}, SectionAdd)
 
@@ -1551,7 +1588,7 @@ function Speed_Library:CreateWindow(Config)
 					BackgroundTransparency = 0.9350000023841858,
 					BorderColor3 = Color3.fromRGB(0, 0, 0),
 					BorderSizePixel = 0,
-					LayoutOrder = ItemCount,
+					LayoutOrder = Config.LayoutOrder or ItemCount,
 					Size = UDim2.new(1, 0, 0, 35),
 					Name = "Slider",
 				}, SectionAdd)
@@ -1759,7 +1796,7 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.935,
           BorderColor3 = Color3.fromRGB(0, 0, 0),
           BorderSizePixel = 0,
-          LayoutOrder = ItemCount,
+          LayoutOrder = Config.LayoutOrder or ItemCount,
           Size = UDim2.new(1, 0, 0, 35),
           Name = "Input",
         }, SectionAdd)
@@ -1887,7 +1924,7 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.935,
           BorderColor3 = Color3.fromRGB(0, 0, 0),
           BorderSizePixel = 0,
-          LayoutOrder = ItemCount,
+          LayoutOrder = Config.LayoutOrder or ItemCount,
           Size = UDim2.new(1, 0, 0, 35),
           Name = "Dropdown"
         }, SectionAdd)
