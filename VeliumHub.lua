@@ -6,8 +6,44 @@ local CoreGui = game:GetService("CoreGui")
 local CS = game:GetService("CollectionService")
 local UIS = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
+
+-- ============================================================
+-- PREFETCH (parallel) — start every remote fetch immediately, before
+-- any WaitForChild / character wait, so total startup cost is the
+-- slowest single request instead of the sum of all of them.
+-- ============================================================
+local PREFETCH = {}
+local function prefetchRaw(key, url)
+	task.spawn(function()
+		local ok, data = pcall(function() return game:HttpGet(url) end)
+		PREFETCH[key] = (ok and type(data) == "string" and data ~= "") and data or false
+	end)
+end
+local function prefetchJson(key, url)
+	task.spawn(function()
+		local ok, data = pcall(function() return Http:JSONDecode(game:HttpGet(url)) end)
+		PREFETCH[key] = (ok and type(data) == "table") and data or false
+	end)
+end
+local function prefetchAwait(key, timeout)
+	local waited = 0
+	while PREFETCH[key] == nil and waited < (timeout or 20) do
+		task.wait(0.05)
+		waited = waited + 0.05
+	end
+	return PREFETCH[key] or nil
+end
+local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua"
+local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua"
+local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
+local MUT_URL  = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/mutation.json"
+prefetchRaw("lib", LIB_URL)
+prefetchRaw("speedui", UI_URL)
+prefetchJson("pets", PETS_URL)
+prefetchJson("mutation", MUT_URL)
+
 local LocalPlayer = Players.LocalPlayer
-local Backpack = LocalPlayer:WaitForChild("Backpack")
+local Backpack = LocalPlayer:WaitForChild("Backpack", 15)
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 LocalPlayer.CharacterAdded:Connect(function(char) Character = char end)
 local DataService = require(RS.Modules.DataService)
@@ -23,10 +59,15 @@ local SellAllPetsRE = RS:WaitForChild("GameEvents"):FindFirstChild("SellAllPets_
 local SellOnePetRE = RS:WaitForChild("GameEvents"):FindFirstChild("SellPetShopSelected")
 local PetGiftingService = RS:WaitForChild("GameEvents"):FindFirstChild("PetGiftingService")
 local PetShardService = RS:WaitForChild("GameEvents"):FindFirstChild("PetShardService_RE")
+
+local tStart = os.clock()
+print("[Velium Hub] Loading... (fetching assets in parallel)")
 local Library
 do
+local libSrc = prefetchAwait("lib")
 local ok, lib = pcall(function()
-return loadstring(game:HttpGet("https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua"))()
+if type(libSrc) ~= "string" then error("empty VeliumMainLibrary source") end
+return loadstring(libSrc)()
 end)
 if ok and lib then
 Library = lib
@@ -34,7 +75,7 @@ else
 warn("[Velium Hub] Failed to load VeliumMainLibrary, retrying...")
 task.wait(2)
 local ok2, lib2 = pcall(function()
-return loadstring(game:HttpGet("https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua"))()
+return loadstring(game:HttpGet(LIB_URL))()
 end)
 if ok2 and lib2 then Library = lib2
 else error("[Velium Hub] Could not load VeliumMainLibrary!") end
@@ -430,7 +471,11 @@ end
 local function getHumanoid()
 return Character and Character:FindFirstChildOfClass("Humanoid")
 end
-local PetJSON = Http:JSONDecode(game:HttpGet("https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"))
+local PetJSON = prefetchAwait("pets") or {}
+if type(PetJSON) ~= "table" or next(PetJSON) == nil then
+pcall(function() PetJSON = Http:JSONDecode(game:HttpGet(PETS_URL)) end)
+end
+if type(PetJSON) ~= "table" then PetJSON = {} end
 local AssetIDs = {}
 task.spawn(function()
 local ok, data = pcall(function()
@@ -438,7 +483,11 @@ return Http:JSONDecode(game:HttpGet("https://raw.githubusercontent.com/Punpunzer
 end)
 if ok and data then AssetIDs = data end
 end)
-local MutJSON = Http:JSONDecode(game:HttpGet("https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/mutation.json"))
+local MutJSON = prefetchAwait("mutation") or {}
+if type(MutJSON) ~= "table" or next(MutJSON) == nil then
+pcall(function() MutJSON = Http:JSONDecode(game:HttpGet(MUT_URL)) end)
+end
+if type(MutJSON) ~= "table" then MutJSON = {} end
 local function getMutName(uuid)
 local inv = getInventory()
 local pet = inv[uuid]
@@ -1154,8 +1203,11 @@ end
 local PetBoostRegistry = nil
 do
 local ok, reg = pcall(function()
-local folder = RS:WaitForChild("Data", 10)
-if folder then return require(folder:WaitForChild("PetBoostRegistry", 5)) end
+local folder = RS:FindFirstChild("Data") or RS:WaitForChild("Data", 2)
+if not folder then return nil end
+local reg2 = folder:FindFirstChild("PetBoostRegistry") or folder:WaitForChild("PetBoostRegistry", 2)
+if not reg2 then return nil end
+return require(reg2)
 end)
 if ok and reg then PetBoostRegistry = reg end
 end
@@ -1277,7 +1329,11 @@ local guiScale = 1
 if isMobile then
 guiScale = math.clamp((viewport.X / 420) * 0.72, 0.65, 1.4)
 end
-local SpeedLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua"))()
+local speedSrc = prefetchAwait("speedui")
+if type(speedSrc) ~= "string" then
+speedSrc = game:HttpGet(UI_URL)
+end
+local SpeedLib = loadstring(speedSrc)()
 local speedTabs = SpeedLib:CreateWindow({"Velium Hub", "| Grow A Garden", 145, UDim2.fromOffset(guiW, guiH)})
 local ScreenGui = speedTabs._Gui
 local mainFrame = speedTabs._Main
@@ -4913,4 +4969,4 @@ end)
 end
 end)
 notifyReady = true
-print("[Velium Hub] Loaded successfully. Build " .. VELIUM_BUILD .. "-speed1.")
+print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed2.", os.clock() - tStart, VELIUM_BUILD))
