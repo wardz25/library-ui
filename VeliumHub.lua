@@ -3195,6 +3195,18 @@ local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
 	descLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
 	makeSwapBtn(card, onEquip)
+	if order == 1 then
+		print("[Velium Hub] DBG cardframe size=" .. tostring(card.Size) .. " abs=" .. tostring(card.AbsoluteSize) .. " vis=" .. tostring(card.Visible))
+		for _, g in ipairs(card:GetChildren()) do
+			local info = g.ClassName .. " size=" .. tostring(g.Size) .. " abs=" .. tostring(g.AbsoluteSize) .. " vis=" .. tostring(g.Visible)
+			if g:IsA("TextLabel") or g:IsA("TextButton") then
+				info = info .. " text=" .. tostring(g.Text) .. " ttrans=" .. tostring(g.TextTransparency)
+			elseif g:IsA("ImageLabel") then
+				info = info .. " img=" .. tostring(g.Image) .. " itrans=" .. tostring(g.ImageTransparency)
+			end
+			print("[Velium Hub] DBG   " .. info)
+		end
+	end
 end
 
 local function buildSavedCard(parent, teamName, petNamesStr, petCount, order, onEquip, onDelete)
