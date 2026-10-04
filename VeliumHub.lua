@@ -1777,7 +1777,7 @@ espRow.LayoutOrder = 25
 UI:corner(espRow, 5); UI:stroke(espRow, T.STROKE, 1)
 UI:label(espRow, "Egg ESP", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
 UI:toggle(espRow, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.espEnabled,
-function(val) cfg.autoHatch.espEnabled = val; saveConfig(); HatchTrack.EggESP.on = val; if not val and HatchTrack.clearEggESP then HatchTrack.clearEggESP() end end)
+function(val) cfg.autoHatch.espEnabled = val; saveConfig(); if HatchTrack.EggESP then HatchTrack.EggESP.on = val; if not val and HatchTrack.clearEggESP then HatchTrack.clearEggESP() end end end)
 local dppRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
 dppRow.LayoutOrder = 27
 UI:corner(dppRow, 5); UI:stroke(dppRow, T.STROKE, 1)
