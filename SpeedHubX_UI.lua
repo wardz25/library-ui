@@ -40,17 +40,24 @@ local function OpenClose()
 
   local Close_ImageButton = Custom:Create("ImageButton", {
     BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-    BorderColor3 = Color3.fromRGB(215, 70, 70),
-    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    BackgroundTransparency = 0,
     Position = UDim2.new(0.1021, 0, 0.0743, 0),
-    Size = UDim2.new(0, 59, 0, 49),
+    Size = UDim2.new(0, 50, 0, 50),
     Image = "rbxassetid://118973578063038",
+    ScaleType = Enum.ScaleType.Fit,
     Visible = false,
   }, ScreenGui)
 
   local UICorner = Custom:Create("UICorner", {
     Name = "MainCorner",
-    CornerRadius = UDim.new(0, 9),
+    CornerRadius = UDim.new(1, 0),
+  }, Close_ImageButton)
+
+  local UIMinStroke = Custom:Create("UIStroke", {
+    Name = "MinRing",
+    Color = Color3.fromRGB(128, 255, 234),
+    Thickness = 2,
   }, Close_ImageButton)
 
   local dragging, dragStart, startPos = false, nil, nil
