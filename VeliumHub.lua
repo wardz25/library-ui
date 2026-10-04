@@ -2328,43 +2328,145 @@ end
 end
 return count
 end
+local EGG_GROUND_Y = 0.3605
+local function eggMatches(tool, eggName)
+if not tool:IsA("Tool") then return false end
+if not CS:HasTag(tool, "PetEggTool") then return false end
+if not eggName or eggName == "" then return true end
+return tool:GetAttribute("h") == eggName
+end
+local function holdHatchEggTool(eggName)
+local char = LocalPlayer.Character or Character
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+local bp = LocalPlayer:FindFirstChild("Backpack") or Backpack
+if not (char and hum and bp) then return false end
+local function holdingEggNow()
+for _, t in ipairs(char:GetChildren()) do
+if eggMatches(t, eggName) then return true end
+end
+return false
+end
+if holdingEggNow() then return true end
+for try = 1, 4 do
+pcall(function() hum:UnequipTools() end)
+task.wait(0.08)
+local egg = nil
+for _, t in ipairs(bp:GetChildren()) do
+if eggMatches(t, eggName) then egg = t; break end
+end
+if not egg then
+if holdingEggNow() then return true end
+return false
+end
+pcall(function() hum:EquipTool(egg) end)
+task.wait(0.18)
+if holdingEggNow() then return true end
+task.wait(0.12)
+end
+return holdingEggNow()
+end
+local function getGardenArea()
+local myFarm = getMyFarm()
+if not myFarm then return nil end
+local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+local found = 0
+pcall(function()
+for _, d in ipairs(myFarm:GetDescendants()) do
+if d.Name:lower():find("can_plant") and d:IsA("BasePart") then
+found = found + 1
+local sx, sz = d.Size.X / 2, d.Size.Z / 2
+minX = math.min(minX, d.Position.X - sx)
+maxX = math.max(maxX, d.Position.X + sx)
+minZ = math.min(minZ, d.Position.Z - sz)
+maxZ = math.max(maxZ, d.Position.Z + sz)
+end
+end
+end)
+if found == 0 then return nil end
+return {minX = minX, maxX = maxX, minZ = minZ, maxZ = maxZ, count = found}
+end
+local function maxEggReached()
+local found = false
+pcall(function()
+local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+if not pg then return end
+for _, d in ipairs(pg:GetDescendants()) do
+if d:IsA("TextLabel") and d.Visible then
+local tx = (d.Text or ""):lower()
+if tx:find("max egg") or tx:find("egg limit") or tx:find("maximum egg") then
+found = true; break
+end
+end
+end
+end)
+return found
+end
+local function countEggPlaced()
+local myFarm = getMyFarm()
+if not myFarm then return 0 end
+local objects = nil
+pcall(function() objects = myFarm.Important:FindFirstChild("Objects_Physical") end)
+if not objects then return 0 end
+local count = 0
+for _, obj in ipairs(objects:GetChildren()) do
+if obj:GetAttribute("OBJECT_TYPE") == "PetEgg" and tostring(obj:GetAttribute("OWNER") or "") == LocalPlayer.Name then
+count = count + 1
+end
+end
+return count
+end
+local function hitPetLimit()
+local hit = false
+pcall(function()
+local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+if not pg then return end
+for _, d in ipairs(pg:GetDescendants()) do
+if d:IsA("TextLabel") and d.Visible then
+local tx = (d.Text or ""):lower()
+if tx:find("cannot open this pet") or tx:find("limit of pet") or tx:find("reached the limit") or tx:find("inventory is full") then
+hit = true; break
+end
+end
+end
+end)
+return hit
+end
 local function placeEggs(eggName, count, spacing)
-local maxEggs = cfg.placeEggs.maxEggs or 20
-local currentEggs = countEggsOnFarm()
-if currentEggs >= maxEggs then
-return 0
-end
+if not PetEggService then return 0 end
+local char = LocalPlayer.Character or Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+if not hrp then return 0 end
+count = count or 6
+local area = getGardenArea()
+if not area then return 0 end
+if not holdHatchEggTool(eggName) then return 0 end
+task.wait(0.15)
+local target = cfg.placeEggs.maxEggs or 20
 local placed = 0
-local eggs = {}
-for _, tool in ipairs(Backpack:GetChildren()) do
-if tool:IsA("Tool") and CS:HasTag(tool, "PetEggTool") then
-if tool:GetAttribute("h") == eggName or eggName == "" then
-table.insert(eggs, tool)
-end
-end
-end
-for _, tool in ipairs(Character:GetChildren()) do
-if tool:IsA("Tool") and CS:HasTag(tool, "PetEggTool") then
-if tool:GetAttribute("h") == eggName or eggName == "" then
-table.insert(eggs, tool)
-end
-end
-end
-for _, tool in ipairs(eggs) do
+local stuck = 0
+for attempt = 1, count * 8 + 30 do
 if placed >= count then break end
-if currentEggs >= maxEggs then break end
-if tool.Parent ~= Character then
-pcall(function() local hum = getHumanoid() if hum then hum:EquipTool(tool) end end)
-task.wait(0.05)
-end
+local before = countEggPlaced()
+if before >= target then break end
+if maxEggReached() then break end
+holdHatchEggTool(eggName)
 local pos = getEggPlacePos()
-if pos then
+if not pos then
+local px = area.minX + math.random() * (area.maxX - area.minX)
+local pz = area.minZ + math.random() * (area.maxZ - area.minZ)
+pos = CFrame.new(px, EGG_GROUND_Y, pz)
+end
 pcall(function() PetEggService:FireServer("CreateEgg", pos) end)
 placed = placed + 1
-currentEggs = currentEggs + 1
+task.wait(0.12)
+local after = countEggPlaced()
+if after <= before then
+stuck = stuck + 1
+if stuck >= 20 then break end
+task.wait(0.1)
+else
+stuck = 0
 end
-pcall(function() local hum = getHumanoid() if hum then hum:UnequipTools() end end)
-task.wait(cfg.placeEggs.eggPlaceDelay or 0.2)
 end
 return placed
 end
@@ -2380,16 +2482,38 @@ end
 return n
 end
 local function hatchAllEggs()
+if not PetEggService then return 0 end
 local eggBefore = totalEggNow()
-local n = 0
+local ready = {}
+pcall(function()
 for _, obj in ipairs(CS:GetTagged("PetEggServer")) do
 if obj:GetAttribute("OWNER") == LocalPlayer.Name then
-local tt = obj:GetAttribute("TimeToHatch") or 0
-if tt <= 0 then
-pcall(function() PetEggService:FireServer("HatchPet", obj) end)
+local tt = obj:GetAttribute("TimeToHatch")
+if tt ~= nil and tonumber(tt) and tonumber(tt) <= 0 then
+table.insert(ready, obj)
+end
+end
+end
+end)
+pcall(function()
+for _, d in ipairs(workspace:GetDescendants()) do
+if d.Name == "PetEgg" and d:GetAttribute("OBJECT_TYPE") == "PetEgg" then
+local owner = d:GetAttribute("OWNER")
+if owner ~= nil and tostring(owner) == LocalPlayer.Name then
+local tth = d:GetAttribute("TimeToHatch")
+if tth ~= nil and tonumber(tth) and tonumber(tth) <= 0 then
+local dup = false
+for _, e in ipairs(ready) do if e == d then dup = true; break end end
+if not dup then table.insert(ready, d) end
+end
+end
+end
+end
+end)
+local n = 0
+for _, egg in ipairs(ready) do
+pcall(function() PetEggService:FireServer("HatchPet", egg) end)
 n = n + 1
-end
-end
 end
 if n > 0 then
 HatchTrack.cycleCount = HatchTrack.cycleCount + 1
@@ -2402,6 +2526,11 @@ HatchTrack.lastEggAfter = eggAfter
 HatchTrack.lastEggDelta = delta
 local back = math.max(0, delta)
 HatchTrack.luckyHatch = HatchTrack.luckyHatch + back
+if hitPetLimit() then
+HatchTrack.bpFullFlag = true
+else
+HatchTrack.bpFullFlag = false
+end
 end
 return n
 end
