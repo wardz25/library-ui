@@ -217,6 +217,12 @@ selVariants = {},
 stopWhenFull = false,
 maxInv = 200,
 },
+autoBuy = {
+seed = {on=false, items={}},
+egg = {on=false, items={}},
+gear = {on=false, items={}},
+nightEgg = {on=false},
+},
 autoHatch = {
 eggName = "Paradise Egg",
 eggCount = 13,
@@ -285,6 +291,8 @@ if cfg.webhook.sendCycle == nil then cfg.webhook.sendCycle = true end
 if cfg.webhook.sendFinished == nil then cfg.webhook.sendFinished = true end
 if cfg.webhook.sendSpecial == nil then cfg.webhook.sendSpecial = true end
 if cfg.webhook.sendHatch == nil then cfg.webhook.sendHatch = true end
+if not cfg.autoBuy then cfg.autoBuy = {seed={on=false,items={}},egg={on=false,items={}},gear={on=false,items={}},nightEgg={on=false}} end
+if data.autoBuy then for k, v in pairs(data.autoBuy) do if type(v) == "table" then if not cfg.autoBuy[k] then cfg.autoBuy[k] = {} end for kk, vv in pairs(v) do cfg.autoBuy[k][kk] = vv end else cfg.autoBuy[k] = v end end end
 if data.leveling then for k, v in pairs(data.leveling) do cfg.leveling[k] = v end end
 if data.autoHatch then for k, v in pairs(data.autoHatch) do cfg.autoHatch[k] = v end end
 if data.autoTrade then for k, v in pairs(data.autoTrade) do cfg.autoTrade[k] = v end end
@@ -507,6 +515,70 @@ end
 end
 return n
 end
+local BuySys = {}
+BuySys.remotes = {seed = "BuySeedStock", egg = "BuyPetEgg", gear = "BuyGearStock"}
+BuySys.getBuyItemList = function(dataKey)
+local out, seen = {}, {}
+pcall(function()
+local dataF = RS:FindFirstChild("Data")
+local mod = dataF and dataF:FindFirstChild(dataKey)
+if not mod then return end
+local ok, tbl = pcall(require, mod)
+if ok and type(tbl) == "table" then
+for k, v in pairs(tbl) do
+local nm = nil
+if type(k) == "string" and #k >= 2 and not k:match("^_") then
+nm = k
+elseif type(v) == "table" then
+nm = v.Name or v.SeedName or v.ItemName or v.DisplayName
+end
+if nm and type(nm) == "string" and not seen[nm] then
+seen[nm] = true
+table.insert(out, nm)
+end
+end
+end
+end)
+table.sort(out)
+return out
+end
+BuySys.fireBuyKind = function(kind)
+local st = cfg.autoBuy and cfg.autoBuy[kind]
+if not st or not st.on then return end
+if not next(st.items or {}) then return end
+local ge = RS:FindFirstChild("GameEvents")
+local re = ge and BuySys.remotes[kind] and ge:FindFirstChild(BuySys.remotes[kind])
+if not re then return end
+for itemName in pairs(st.items) do
+pcall(function() re:FireServer(itemName) end)
+task.wait(0.1)
+end
+end
+BuySys.nightTick = function()
+local st = cfg.autoBuy and cfg.autoBuy.nightEgg
+if not (st and st.on) then return end
+local ge = RS:FindFirstChild("GameEvents")
+local re = ge and ge:FindFirstChild("BuyEventShopStock")
+if not re then return end
+for _, shop in ipairs({"Blood Moon Shop", "Twilight Shop"}) do
+pcall(function() re:FireServer("Night Egg", shop) end)
+task.wait(0.1)
+end
+end
+for _, kind in ipairs({"seed", "egg", "gear"}) do
+task.spawn(function()
+while true do
+task.wait(1)
+pcall(function() BuySys.fireBuyKind(kind) end)
+end
+end)
+end
+task.spawn(function()
+while true do
+task.wait(10)
+pcall(BuySys.nightTick)
+end
+end)
 local progressHistory = {}
 local function sendCycleWebhook(petName, fromKG, toKG, targetKG, cycleTime, phase, queuePos, queueTotal, petId)
 if cfg.webhook.sendCycle == false then return end
@@ -1147,8 +1219,12 @@ end
 task.wait(0.05)
 pcall(function() tool.Parent = Character end)
 task.wait(0.1)
+pcall(function() BoostRemote:FireServer("ApplyBoost", "{" .. tostring(uuid):gsub("[{}]", "") .. "}") end)
+task.wait(0.1)
+if not hasBoostApplied(uuid, statName, petModelName) then
 pcall(function() BoostRemote:FireServer("ApplyBoost", uuid) end)
 task.wait(0.1)
+end
 pcall(function()
 local t = Character:FindFirstChildWhichIsA("Tool")
 if t and CS:HasTag(t, "PetBoost") then t.Parent = Backpack end
@@ -2688,12 +2764,18 @@ HatchTrack.lastEggBefore = eggBefore
 HatchTrack.lastEggAfter = eggAfter
 HatchTrack.lastEggDelta = delta
 if delta > 0 then HatchTrack.luckySell = HatchTrack.luckySell + delta end
+HatchTrack.lastSellInv = petAfter
+HatchTrack.sellExhausted = (sold == 0)
 return sold
 end
 local function sellAllPets(logFn)
 local eggBefore = totalEggNow()
 local petBefore = 0
 pcall(function() local inv = getInventory(); for _ in pairs(inv) do petBefore = petBefore + 1 end end)
+if HatchTrack.sellExhausted and petBefore == (HatchTrack.lastSellInv or 0) then
+if logFn then logFn("Sell skipped (nothing new to sell)", T.DIM) end
+return 0
+end
 if not SellAllPetsRE then
 if logFn then logFn("SellAllPets_RE not found!", T.ERROR) end
 return 0
@@ -2798,6 +2880,22 @@ pcall(function() FavItemRemote:FireServer(tool) end)
 task.wait(delay or 0.1)
 end
 end
+end
+local function uuidKey(u) return tostring(u or ""):gsub("[{}]", ""):lower() end
+local function waitTeamEquipped(teamName, timeoutSec)
+local want = getTeamUUIDs(teamName)
+if #want == 0 then return false end
+timeoutSec = timeoutSec or 10
+local t0 = os.clock()
+while os.clock() - t0 < timeoutSec do
+local have = {}
+pcall(function() for _, u in ipairs(getActivePets()) do have[uuidKey(u)] = true end end)
+local okAll = true
+for _, u in ipairs(want) do if not have[uuidKey(u)] then okAll = false; break end end
+if okAll then return true end
+task.wait(1)
+end
+return false
 end
 local function wearTeam(teamName)
 if not teamName then return end
@@ -2913,6 +3011,11 @@ HatchTrack.phase = "koi"
 if a.teamKoi then
 logFn("Equipping Koi team...", T.ACCENT)
 wearTeam(a.teamKoi)
+if waitTeamEquipped(a.teamKoi, 10) then
+logFn("Koi team verified in garden", T.SUCCESS)
+else
+logFn("Koi team incomplete, proceeding anyway", T.DIM)
+end
 task.wait(1)
 end
 local beforeHatch = {}
@@ -3566,6 +3669,111 @@ statusLabel.TextColor3 = T.DIM
 end
 end)
 end
+end
+do
+local buyAcc = UI:accordion(miscScroll, "AUTO BUY", 4, true)
+local buyInner = buyAcc.Inner
+local buyOv = UI:frame(PageMisc, UDim2.new(1,0,1,0), nil, T.BG)
+buyOv.Visible = false; buyOv.ZIndex = 25
+local buyBar = UI:frame(buyOv, UDim2.new(1,0,0,30), nil, T.PANEL)
+UI:stroke(buyBar, T.STROKE, 1)
+local buyTitle = UI:label(buyBar, "Select items", UDim2.new(1,-100,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
+local buyAllBtn = UI:button(buyBar, "All", UDim2.new(0,40,0,22), UDim2.new(1,-92,0.5,-11), T.BTN, T.ACCENT, 9)
+UI:stroke(buyAllBtn, T.ACCENT, 1)
+local buyX = UI:button(buyBar, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
+UI:stroke(buyX, T.ERROR, 1)
+local buySearch = UI:input(buyOv, "", "Search...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
+buySearch.TextColor3 = T.TEXT
+local buySF = UI:scroll(buyOv, UDim2.new(1,0,1,-60), UDim2.new(0,0,0,58))
+UI:list(buySF, 3); UI:pad(buySF, 3,4,4,3)
+local buyKind, buyKindDK = "egg", "PetEggData"
+local buyLbls = {}
+local function refreshBuyLbl()
+for k, lbl in pairs(buyLbls) do
+local st = cfg.autoBuy and cfg.autoBuy[k]
+local n = 0
+if st and st.items then for _ in pairs(st.items) do n = n + 1 end end
+lbl.Text = n == 0 and "NONE" or (n .. " selected")
+lbl.TextColor3 = n == 0 and T.DIM or T.ACCENT
+end
+end
+local function rebuildBuy()
+for _, c in ipairs(buySF:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
+local q = string.lower(buySearch.Text)
+local st = cfg.autoBuy and cfg.autoBuy[buyKind]
+if not st then return end
+if not st.items then st.items = {} end
+local n = 0
+for _, name in ipairs(BuySys.getBuyItemList(buyKindDK)) do
+if q ~= "" and not string.lower(name):find(q, 1, true) then continue end
+n = n + 1
+local sel = st.items[name] == true
+local b = UI:button(buySF, name, UDim2.new(1,0,0,26), nil,
+sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
+b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
+UI:pad(b, 0, 8, 2, 0); UI:corner(b, 5); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
+local nm = name
+b.MouseButton1Click:Connect(function()
+if st.items[nm] then st.items[nm] = nil else st.items[nm] = true end
+saveConfig(); refreshBuyLbl(); rebuildBuy()
+end)
+end
+end
+local function openBuyPicker(kind, title, dk)
+buyKind, buyKindDK = kind, dk
+buyTitle.Text = title
+buySearch.Text = ""
+rebuildBuy()
+buyOv.Visible = true
+end
+buyX.MouseButton1Click:Connect(function() buyOv.Visible = false; refreshBuyLbl() end)
+buySearch:GetPropertyChangedSignal("Text"):Connect(rebuildBuy)
+buyAllBtn.MouseButton1Click:Connect(function()
+local st = cfg.autoBuy and cfg.autoBuy[buyKind]
+if not st then return end
+if not st.items then st.items = {} end
+local allSel = true
+for _, name in ipairs(BuySys.getBuyItemList(buyKindDK)) do
+if not st.items[name] then allSel = false; break end
+end
+for _, name in ipairs(BuySys.getBuyItemList(buyKindDK)) do
+st.items[name] = allSel and nil or true
+end
+saveConfig(); refreshBuyLbl(); rebuildBuy()
+end)
+local buySpecs = {
+{key = "seed", label = "Auto Buy Seeds", pick = "Seeds", dk = "SeedData"},
+{key = "egg", label = "Auto Buy Eggs", pick = "Eggs", dk = "PetEggData"},
+{key = "gear", label = "Auto Buy Gears", pick = "Gears", dk = "GearData"},
+}
+for bi, spec in ipairs(buySpecs) do
+local trow = UI:frame(buyInner, UDim2.new(1,0,0,26), nil, T.BTN)
+trow.LayoutOrder = bi * 2 - 1
+UI:corner(trow, 5); UI:stroke(trow, T.STROKE, 1)
+UI:label(trow, spec.label, UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
+local kk = spec.key
+if not cfg.autoBuy[kk] then cfg.autoBuy[kk] = {on=false, items={}} end
+UI:toggle(trow, UDim2.new(1,-48,0.5,-11), cfg.autoBuy[kk].on,
+function(val) cfg.autoBuy[kk].on = val; saveConfig() end)
+local prow = UI:frame(buyInner, UDim2.new(1,0,0,26), nil, T.BTN)
+prow.LayoutOrder = bi * 2
+UI:corner(prow, 5); UI:stroke(prow, T.STROKE, 1)
+local clbl = UI:label(prow, "NONE", UDim2.new(1,-100,1,0), UDim2.new(0,6,0,0), T.DIM, 9)
+clbl.Font = Enum.Font.Gotham
+buyLbls[kk] = clbl
+local sbtn = UI:button(prow, "Select >", UDim2.new(0,90,0,20), UDim2.new(1,-94,0.5,-10), T.BTN, T.ACCENT, 9)
+UI:stroke(sbtn, T.STROKE, 1)
+local dk2, tt2 = spec.dk, "Select " .. spec.pick
+sbtn.MouseButton1Click:Connect(function() openBuyPicker(kk, tt2, dk2) end)
+end
+refreshBuyLbl()
+local nrow = UI:frame(buyInner, UDim2.new(1,0,0,26), nil, T.BTN)
+nrow.LayoutOrder = 7
+UI:corner(nrow, 5); UI:stroke(nrow, T.STROKE, 1)
+UI:label(nrow, "Auto Buy Night Egg", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
+if not cfg.autoBuy.nightEgg then cfg.autoBuy.nightEgg = {on=false} end
+UI:toggle(nrow, UDim2.new(1,-48,0.5,-11), cfg.autoBuy.nightEgg.on,
+function(val) cfg.autoBuy.nightEgg.on = val; saveConfig() end)
 end
 print("[Velium Hub] Building INTERFACE accordion...")
 local ifAcc = UI:accordion(miscScroll, "INTERFACE", 5, true)
@@ -4865,6 +5073,16 @@ task.spawn(function()
 			end
 		end
 	end
+end)
+task.spawn(function()
+local ok, vu = pcall(function() return game:GetService("VirtualUser") end)
+if ok and vu then
+pcall(function()
+LocalPlayer.Idled:Connect(function()
+pcall(function() vu:CaptureController(); vu:ClickButton2(Vector2.new()) end)
+end)
+end)
+end
 end)
 for i = 2, #tabNames do tabPages[i].Visible = false end
 notifyReady = true
