@@ -1850,7 +1850,7 @@ statusLbl.Text = "Cycle " .. cycle
 statusLbl.TextColor3 = T.SUCCESS
 addLog(string.format("--- Cycle %d ---", cycle), T.ACCENT)
 local ok, err = pcall(runHatchCycle, function(t,c) statusLbl.Text = t; statusLbl.TextColor3 = c end, addLog)
-if not ok then addLog("Error: " .. tostring(err), T.ERROR) end
+if not ok then addLog("Error: " .. tostring(err), T.ERROR); print("[Velium Hub] HATCH TRACEBACK: " .. tostring(debug.traceback(err, 2))) end
 if not hatchRunning then break end
 task.wait(1)
 end
