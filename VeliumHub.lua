@@ -1293,10 +1293,10 @@ local tabMisc = speedTabs:CreateTab({"MISC", ""})
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
+local titleLbl0, descLbl0 = nil, nil
 for _, c in ipairs(topF:GetChildren()) do
-if c:IsA("TextLabel") and c.Position.X.Offset == 10 and c.Size.X.Scale == 1 then
-c.Position = UDim2.new(0, 30, 0, 0)
-break
+if c:IsA("TextLabel") and c.TextXAlignment == Enum.TextXAlignment.Left then
+if c:FindFirstChildOfClass("UIStroke") then descLbl0 = c else titleLbl0 = c end
 end
 end
 local logoImg = Instance.new("ImageLabel")
@@ -1306,6 +1306,19 @@ logoImg.BackgroundTransparency = 1
 logoImg.Image = "rbxassetid://118973578063038"
 logoImg.ScaleType = Enum.ScaleType.Fit
 logoImg.Parent = topF
+task.defer(function()
+pcall(function()
+if titleLbl0 then
+titleLbl0.Position = UDim2.new(0, 30, 0, 0)
+local tw = titleLbl0.TextBounds.X
+titleLbl0.Size = UDim2.new(0, tw + 4, 1, 0)
+if descLbl0 then
+descLbl0.Position = UDim2.new(0, 30 + tw + 10, 0, 0)
+descLbl0.Size = UDim2.new(1, -(30 + tw + 10 + 70), 1, 0)
+end
+end
+end)
+end)
 end
 local layersTab = mainFrame:FindFirstChild("LayersTab")
 local scrollTab = layersTab and layersTab:FindFirstChild("ScrollTab")
@@ -3134,7 +3147,7 @@ local function makeDeleteBtn(card, onDelete)
 end
 
 local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
-	local singleDesc = teamDesc:gsub("\n", " Â· ")
+	local singleDesc = tostring(teamDesc or ""):gsub("\n", " | ")
 	local card = Instance.new("Frame", parent)
 	card.Size = UDim2.new(1, 0, 0, 58)
 	card.BackgroundColor3 = Color3.fromRGB(24, 24, 31)
@@ -3161,7 +3174,7 @@ local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
 	nameLbl.Size = UDim2.new(1, -96, 0, 15)
 	nameLbl.Position = UDim2.new(0, 62, 0, 22)
 	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = teamName
+	nameLbl.Text = tostring(teamName or "?")
 	nameLbl.TextColor3 = Color3.fromRGB(245, 243, 236)
 	nameLbl.Font = Enum.Font.GothamBold
 	nameLbl.TextSize = 11
@@ -3199,7 +3212,7 @@ local function buildSavedCard(parent, teamName, petNamesStr, petCount, order, on
 	nameLbl.Size = UDim2.new(1,-124,0,16)
 	nameLbl.Position = UDim2.new(0,62,0,14)
 	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = teamName
+	nameLbl.Text = tostring(teamName or "?")
 	nameLbl.TextColor3 = T.TEXT
 	nameLbl.Font = Enum.Font.GothamBold
 	nameLbl.TextSize = 11
