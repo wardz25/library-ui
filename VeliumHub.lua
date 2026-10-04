@@ -3148,7 +3148,6 @@ local function makeDeleteBtn(card, onDelete)
 end
 
 local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
-	print("[Velium Hub] DBG card#" .. tostring(order) .. " name=" .. tostring(teamName) .. " parentW=" .. tostring(parent.AbsoluteSize.X))
 	local singleDesc = tostring(teamDesc or ""):gsub("\n", " | ")
 	local card = Instance.new("Frame", parent)
 	card.Size = UDim2.new(1, 0, 0, 58)
@@ -3196,18 +3195,6 @@ local function buildBuiltinCard(parent, teamName, teamDesc, order, onEquip)
 	descLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
 	makeSwapBtn(card, onEquip)
-	if order == 1 then
-		print("[Velium Hub] DBG cardframe size=" .. tostring(card.Size) .. " abs=" .. tostring(card.AbsoluteSize) .. " vis=" .. tostring(card.Visible))
-		for _, g in ipairs(card:GetChildren()) do
-			local info = g.ClassName .. " size=" .. tostring(g.Size) .. " abs=" .. tostring(g.AbsoluteSize) .. " vis=" .. tostring(g.Visible)
-			if g:IsA("TextLabel") or g:IsA("TextButton") then
-				info = info .. " text=" .. tostring(g.Text) .. " ttrans=" .. tostring(g.TextTransparency)
-			elseif g:IsA("ImageLabel") then
-				info = info .. " img=" .. tostring(g.Image) .. " itrans=" .. tostring(g.ImageTransparency)
-			end
-			print("[Velium Hub] DBG   " .. info)
-		end
-	end
 end
 
 local function buildSavedCard(parent, teamName, petNamesStr, petCount, order, onEquip, onDelete)
@@ -3262,22 +3249,25 @@ local function rebuildTeams()
 	end
 
 	-- â”€â”€ Render built-in teams (always in builtinContainer)
-	local builtins = _G._NH_BUILTIN_TEAMS or builtInTeams
+	local builtins = (function() local s = _G._NH_BUILTIN_TEAMS; if type(s) ~= "table" then return builtInTeams end; for _, t in ipairs(s) do if type(t) ~= "table" or type(t.name) ~= "string" then return builtInTeams end end; return s end)()
 	for i, team in ipairs(builtins) do
 		local idx = i
-		buildBuiltinCard(builtinContainer, team.name, team.desc, i, function()
-			task.spawn(function()
-				local uuids = getTeamUUIDs(team.name)
-				if #uuids == 0 then return end
-				unequipAll()
-				task.wait(0.1)
-				local cf = getFarmCF()
-				for _, uuid in ipairs(uuids) do
-					pcall(function() PetsRemote:FireServer("EquipPet", uuid, cf) end)
-					task.wait(TIMING.EQUIP_DELAY)
-				end
+		local okCard, cardErr = pcall(function()
+			buildBuiltinCard(builtinContainer, team.name, team.desc, i, function()
+				task.spawn(function()
+					local uuids = getTeamUUIDs(team.name)
+					if #uuids == 0 then return end
+					unequipAll()
+					task.wait(0.1)
+					local cf = getFarmCF()
+					for _, uuid in ipairs(uuids) do
+						pcall(function() PetsRemote:FireServer("EquipPet", uuid, cf) end)
+						task.wait(TIMING.EQUIP_DELAY)
+					end
+				end)
 			end)
 		end)
+		if not okCard then warn("[Velium Hub] builtin card " .. tostring(i) .. " failed: " .. tostring(cardErr)) end
 	end
 
 	-- â”€â”€ Render saved teams (always in teamsContainer)
@@ -3309,7 +3299,7 @@ local function rebuildTeams()
 		local petNamesStr = #petNames > 0 and table.concat(petNames, ", ") or "No pets found"
 		local capturedName = name
 		local capturedData = teamData
-		buildSavedCard(teamsContainer, name, petNamesStr, #(teamData.uuids or {}), i,
+		local okCard2, cardErr2 = pcall(function() buildSavedCard(teamsContainer, name, petNamesStr, #(teamData.uuids or {}), i,
 			function()
 				task.spawn(function()
 					local ok2, active = pcall(getActivePets)
@@ -3348,6 +3338,8 @@ local function rebuildTeams()
 				for _, ref in ipairs(ddRefs) do pcall(function() ref.Refresh() end) end
 			end
 		)
+		end)
+		if not okCard2 then warn("[Velium Hub] saved card " .. tostring(name) .. " failed: " .. tostring(cardErr2)) end
 	end
 end
 
@@ -3375,7 +3367,8 @@ end)
 _G._NH_BUILTIN_TEAMS = builtInTeams
 _G._NH_rebuildTeams = rebuildTeams
 _G._NH_ddRefs = ddRefs
-rebuildTeams()
+local okBuild, buildErr = pcall(rebuildTeams)
+if not okBuild then warn("[Velium Hub] rebuildTeams failed: " .. tostring(buildErr)) end
 end
 
 -- ============================================================
