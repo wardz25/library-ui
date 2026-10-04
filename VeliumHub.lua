@@ -2403,16 +2403,36 @@ end)
 return found
 end
 local function countEggPlaced()
-local myFarm = getMyFarm()
-if not myFarm then return 0 end
-local objects = nil
-pcall(function() objects = myFarm.Important:FindFirstChild("Objects_Physical") end)
-if not objects then return 0 end
+local seen = {}
 local count = 0
+local function addEgg(o)
+if o and not seen[o] then seen[o] = true; count = count + 1 end
+end
+pcall(function()
+local myFarm = getMyFarm()
+local objects = myFarm and myFarm.Important:FindFirstChild("Objects_Physical")
+if objects then
 for _, obj in ipairs(objects:GetChildren()) do
 if obj:GetAttribute("OBJECT_TYPE") == "PetEgg" and tostring(obj:GetAttribute("OWNER") or "") == LocalPlayer.Name then
-count = count + 1
+addEgg(obj)
 end
+end
+end
+end)
+pcall(function()
+for _, obj in ipairs(CS:GetTagged("PetEggServer")) do
+if obj:GetAttribute("OWNER") == LocalPlayer.Name then addEgg(obj) end
+end
+end)
+if count == 0 then
+pcall(function()
+for _, d in ipairs(workspace:GetDescendants()) do
+if d.Name == "PetEgg" and d:GetAttribute("OBJECT_TYPE") == "PetEgg" then
+local owner = d:GetAttribute("OWNER")
+if owner ~= nil and tostring(owner) == LocalPlayer.Name then addEgg(d) end
+end
+end
+end)
 end
 return count
 end
@@ -2567,9 +2587,17 @@ local px = area.minX + math.random() * (area.maxX - area.minX)
 local pz = area.minZ + math.random() * (area.maxZ - area.minZ)
 pos = CFrame.new(px, EGG_GROUND_Y, pz)
 end
+if placed == 0 then
+pcall(function()
+local heldName = "?"
+local ch = LocalPlayer.Character or Character
+if ch then for _, t in ipairs(ch:GetChildren()) do if eggMatches(t, eggName) then heldName = t.Name; break end end end
+plog("Firing CreateEgg '" .. heldName .. "' @ " .. tostring(pos), T.DIM)
+end)
+end
 pcall(function() PetEggService:FireServer("CreateEgg", pos) end)
 placed = placed + 1
-task.wait(0.12)
+task.wait(0.25)
 local after = countEggPlaced()
 if after <= before then
 stuck = stuck + 1
@@ -2842,12 +2870,26 @@ local zeroHits = 0
 while os.clock() < timeout do
 local eggCount = 0
 local allReady = true
-for _, obj in ipairs(CS:GetTagged("PetEggServer")) do
-if obj:GetAttribute("OWNER") == LocalPlayer.Name then
+local seenEggs = {}
+local function noteEgg(o)
+if o and not seenEggs[o] then
+seenEggs[o] = true
 eggCount = eggCount + 1
-if (obj:GetAttribute("TimeToHatch") or 0) > 0 then allReady = false end
+local tth = o:GetAttribute("TimeToHatch")
+if tth ~= nil and tonumber(tth) and tonumber(tth) > 0 then allReady = false end
 end
 end
+for _, obj in ipairs(CS:GetTagged("PetEggServer")) do
+if obj:GetAttribute("OWNER") == LocalPlayer.Name then noteEgg(obj) end
+end
+pcall(function()
+for _, d in ipairs(workspace:GetDescendants()) do
+if d.Name == "PetEgg" and d:GetAttribute("OBJECT_TYPE") == "PetEgg" then
+local owner = d:GetAttribute("OWNER")
+if owner ~= nil and tostring(owner) == LocalPlayer.Name then noteEgg(d) end
+end
+end
+end)
 if eggCount > 0 and allReady then break end
 if eggCount == 0 and placed > 0 then
 zeroHits = zeroHits + 1
