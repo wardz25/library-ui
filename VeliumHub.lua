@@ -1285,11 +1285,12 @@ local confirmOv
 local modalRoot = UI:frame(ScreenGui, UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), T.BG, 1)
 modalRoot.Name = "VeliumModal"
 modalRoot.ZIndex = 200
-local tabHatch = speedTabs:CreateTab({"HATCH", ""})
-local tabAuto = speedTabs:CreateTab({"AUTOMATION", ""})
-local tabTeams = speedTabs:CreateTab({"TEAMS", ""})
-local tabWebhook = speedTabs:CreateTab({"WEBHOOK", ""})
-local tabMisc = speedTabs:CreateTab({"MISC", ""})
+local TAB_ICONS = {HATCH = "", AUTOMATION = "", TEAMS = "", WEBHOOK = "", MISC = ""}
+local tabHatch = speedTabs:CreateTab({"HATCH", TAB_ICONS.HATCH})
+local tabAuto = speedTabs:CreateTab({"AUTOMATION", TAB_ICONS.AUTOMATION})
+local tabTeams = speedTabs:CreateTab({"TEAMS", TAB_ICONS.TEAMS})
+local tabWebhook = speedTabs:CreateTab({"WEBHOOK", TAB_ICONS.WEBHOOK})
+local tabMisc = speedTabs:CreateTab({"MISC", TAB_ICONS.MISC})
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
@@ -1327,17 +1328,17 @@ scrollTab.Size = UDim2.new(1, 0, 1, -66)
 local prof = UI:frame(layersTab, UDim2.new(1, -8, 0, 48), UDim2.new(0, 4, 1, -52), T.PANEL)
 UI:corner(prof, 8); UI:stroke(prof, T.STROKE, 1)
 local av = Instance.new("ImageLabel", prof)
-av.Size = UDim2.new(0, 32, 0, 32)
-av.Position = UDim2.new(0, 8, 0.5, -16)
+av.Size = UDim2.new(0, 30, 0, 30)
+av.Position = UDim2.new(0, 6, 0.5, -15)
 av.BackgroundTransparency = 1
 av.Image = "rbxassetid://118973578063038"
 av.ScaleType = Enum.ScaleType.Fit
-UI:corner(av, 16)
+UI:corner(av, 15)
 pcall(function()
 local thumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
 if thumb and thumb ~= "" then av.Image = thumb end
 end)
-local nm = UI:label(prof, LocalPlayer.Name, UDim2.new(1, -48, 1, 0), UDim2.new(0, 44, 0, 0), T.TEXT, 11)
+local nm = UI:label(prof, LocalPlayer.Name, UDim2.new(1, -44, 1, 0), UDim2.new(0, 40, 0, 0), T.TEXT, 10)
 nm.Font = Enum.Font.GothamBold
 nm.TextTruncate = Enum.TextTruncate.AtEnd
 end
