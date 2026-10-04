@@ -1777,7 +1777,7 @@ espRow.LayoutOrder = 25
 UI:corner(espRow, 5); UI:stroke(espRow, T.STROKE, 1)
 UI:label(espRow, "Egg ESP", UDim2.new(1,-52,1,0), UDim2.new(0,6,0,0), T.TEXT, 9).Font = Enum.Font.GothamBold
 UI:toggle(espRow, UDim2.new(1,-48,0.5,-11), cfg.autoHatch.espEnabled,
-function(val) cfg.autoHatch.espEnabled = val; saveConfig() end)
+function(val) cfg.autoHatch.espEnabled = val; saveConfig(); HatchTrack.EggESP.on = val; if not val and HatchTrack.clearEggESP then HatchTrack.clearEggESP() end end)
 local dppRow = UI:frame(hatchInner, UDim2.new(1,0,0,26), nil, T.BTN)
 dppRow.LayoutOrder = 27
 UI:corner(dppRow, 5); UI:stroke(dppRow, T.STROKE, 1)
@@ -2432,16 +2432,122 @@ end
 end)
 return hit
 end
-local function placeEggs(eggName, count, spacing)
-if not PetEggService then return 0 end
+HatchTrack.EggESP = {on = cfg.autoHatch.espEnabled ~= false, billboards = {}}
+local function fmtEggTime(s)
+s = math.max(0, math.floor(s or 0))
+if s <= 0 then return "READY" end
+if s >= 3600 then return string.format("%dh %dm", math.floor(s / 3600), math.floor((s % 3600) / 60)) end
+if s >= 60 then return string.format("%dm %ds", math.floor(s / 60), s % 60) end
+return s .. "s"
+end
+local _eggESPcache = {list = {}, t = 0}
+local function getMyPlacedEggs()
+if (os.clock() - _eggESPcache.t) < 2 and _eggESPcache.list then return _eggESPcache.list end
+local list = {}
+local seen = {}
+pcall(function()
+for _, obj in ipairs(CS:GetTagged("PetEggServer")) do
+if obj:GetAttribute("OWNER") == LocalPlayer.Name then
+seen[obj] = true
+table.insert(list, obj)
+end
+end
+end)
+pcall(function()
+for _, d in ipairs(workspace:GetDescendants()) do
+if d.Name == "PetEgg" and d:GetAttribute("OBJECT_TYPE") == "PetEgg" and not seen[d] then
+local owner = d:GetAttribute("OWNER")
+if owner ~= nil and tostring(owner) == LocalPlayer.Name then
+seen[d] = true
+table.insert(list, d)
+end
+end
+end
+end)
+_eggESPcache.list = list; _eggESPcache.t = os.clock()
+return list
+end
+local function makeEggBillboard(egg)
+local bb = Instance.new("BillboardGui")
+bb.Name = "VeliumEggESP"
+bb.Size = UDim2.new(0, 150, 0, 40)
+bb.StudsOffset = Vector3.new(0, 3, 0)
+bb.AlwaysOnTop = true
+bb.MaxDistance = 1000
+bb.Adornee = egg
+bb.Parent = egg
+local nameL = Instance.new("TextLabel")
+nameL.Size = UDim2.new(1, 0, 0.5, 0)
+nameL.BackgroundTransparency = 1
+nameL.Font = Enum.Font.GothamBold
+nameL.TextSize = 13
+nameL.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameL.TextStrokeTransparency = 0
+nameL.Text = tostring(egg:GetAttribute("EggName") or egg:GetAttribute("h") or cfg.autoHatch.eggName or "Egg")
+nameL.Parent = bb
+local timeL = Instance.new("TextLabel")
+timeL.Size = UDim2.new(1, 0, 0.5, 0)
+timeL.Position = UDim2.new(0, 0, 0.5, 0)
+timeL.BackgroundTransparency = 1
+timeL.Font = Enum.Font.GothamBold
+timeL.TextSize = 12
+timeL.TextStrokeTransparency = 0
+timeL.Text = "..."
+timeL.Parent = bb
+return bb, timeL
+end
+local function updateEggESP()
+if not HatchTrack.EggESP.on then return end
+pcall(function()
+local seenNow = {}
+for _, d in ipairs(getMyPlacedEggs()) do
+if d and d.Parent then
+seenNow[d] = true
+local bb = d:FindFirstChild("VeliumEggESP")
+local timeL = HatchTrack.EggESP.billboards[d]
+if not bb then
+bb, timeL = makeEggBillboard(d)
+HatchTrack.EggESP.billboards[d] = timeL
+end
+if timeL then
+local tth = tonumber(d:GetAttribute("TimeToHatch")) or 0
+local rdy = tth <= 0
+timeL.Text = fmtEggTime(tth)
+timeL.TextColor3 = rdy and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(255, 210, 80)
+end
+end
+end
+for egg, _ in pairs(HatchTrack.EggESP.billboards) do
+if not seenNow[egg] then HatchTrack.EggESP.billboards[egg] = nil end
+end
+end)
+end
+local function clearEggESP()
+pcall(function()
+for _, d in ipairs(workspace:GetDescendants()) do
+if d.Name == "VeliumEggESP" then d:Destroy() end
+end
+end)
+HatchTrack.EggESP.billboards = {}
+end
+HatchTrack.clearEggESP = clearEggESP
+task.spawn(function()
+while true do
+if HatchTrack.EggESP.on then updateEggESP() end
+task.wait(1)
+end
+end)
+local function placeEggs(eggName, count, spacing, logFn)
+local function plog(m, c) if logFn then logFn(m, c) end end
+if not PetEggService then plog("No PetEggService!", T.ERROR); return 0 end
 if HatchTrack.hatchRunning == false then return 0 end
 local char = LocalPlayer.Character or Character
 local hrp = char and char:FindFirstChild("HumanoidRootPart")
-if not hrp then return 0 end
+if not hrp then plog("No character/HRP (respawning?)", T.ERROR); return 0 end
 count = count or 6
 local area = getGardenArea()
-if not area then return 0 end
-if not holdHatchEggTool(eggName) then return 0 end
+if not area then plog("No garden area (no Can_Plant plots found)", T.ERROR); return 0 end
+if not holdHatchEggTool(eggName) then plog("No '" .. tostring(eggName) .. "' egg tool to hold", T.ERROR); return 0 end
 task.wait(0.15)
 local target = cfg.placeEggs.maxEggs or 20
 local placed = 0
@@ -2450,8 +2556,8 @@ for attempt = 1, count * 8 + 30 do
 if HatchTrack.hatchRunning == false then return placed end
 if placed >= count then break end
 local before = countEggPlaced()
-if before >= target then break end
-if maxEggReached() then break end
+if before >= target then plog("Egg target reached (" .. before .. "/" .. target .. ")", T.DIM); break end
+if maxEggReached() then plog("Max egg notice on screen, stopping place", T.ERROR); break end
 holdHatchEggTool(eggName)
 local pos = getEggPlacePos()
 if not pos then
@@ -2465,12 +2571,13 @@ task.wait(0.12)
 local after = countEggPlaced()
 if after <= before then
 stuck = stuck + 1
-if stuck >= 20 then break end
+if stuck >= 20 then plog("Place stuck (server not spawning eggs)", T.ERROR); break end
 task.wait(0.1)
 else
 stuck = 0
 end
 end
+plog(string.format("Place done: %d fired (stuck %d)", placed, stuck), T.DIM)
 return placed
 end
 local function countEggs(eggName)
@@ -2720,7 +2827,7 @@ else
 logFn("Placing eggs...", T.ACCENT)
 if HatchTrack.hatchRunning == false then logFn("---- Stopped by user ----", T.ERROR); return end
 HatchTrack.phase = "place"
-placed = placeEggs(a.eggName, a.eggCount, a.eggSpacing)
+placed = placeEggs(a.eggName, a.eggCount, a.eggSpacing, logFn)
 if placed == 0 then logFn("No eggs to place!", T.ERROR); return end
 logFn(string.format("Placed %d eggs, waiting for hatch...", placed), T.ACCENT)
 end
