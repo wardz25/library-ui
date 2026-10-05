@@ -33,6 +33,22 @@ end
 
 Custom:EnabledAFK()
 
+-- Velium: robust wrapped-line count. When a label has not been measured yet
+-- (AbsoluteSize.X == 0 -- e.g. its tab is still hidden while items are built)
+-- a raw division yields inf/nan and poisons every parent Size, which throws
+-- when a tween/UDim2 gets a non-finite number and aborts the whole tab build.
+-- Fall back to a sane line count instead of exploding.
+local function VH_LineCount(TextBoundsX, AbsoluteSizeX, useFloor)
+  local aw = AbsoluteSizeX
+  if not aw or aw ~= aw or aw <= 1 then return useFloor and 0 or 1 end
+  local tb = TextBoundsX or 0
+  if tb ~= tb or tb <= 0 then return 0 end
+  local lines = useFloor and math.floor(tb / aw) or math.ceil(tb / aw)
+  if lines ~= lines or lines < 0 then return 0 end
+  if lines > 100 then lines = 100 end
+  return lines
+end
+
 local function OpenClose()
   local ScreenGui = Custom:Create("ScreenGui", {
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -338,7 +354,7 @@ function Speed_Library:SetNotification(Config)
     Parent = NotificationFrameReal
   })
 
-  TextLabel2.Size = UDim2.new(1, -20, 0, 13 + (13 * (TextLabel2.TextBounds.X // math.max(1, TextLabel2.AbsoluteSize.X))))
+  TextLabel2.Size = UDim2.new(1, -20, 0, 13 + (13 * VH_LineCount(TextLabel2.TextBounds.X, TextLabel2.AbsoluteSize.X, true)))
   TextLabel2.TextWrapped = true
 
   if TextLabel2.AbsoluteSize.Y < 27 then
@@ -918,9 +934,10 @@ function Speed_Library:CreateWindow(Config)
         LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
 
         -- Velium: re-measure this tab's sections now that it is visible.
+        -- Wait for the page tween (0.5s) to land so AbsoluteSize is final.
         local _secUpdaters = SectionUpdaters[ScrolLayers]
         if _secUpdaters then
-          task.defer(function()
+          task.delay(0.55, function()
             for _, fn in ipairs(_secUpdaters) do pcall(fn) end
           end)
         end
@@ -943,13 +960,19 @@ function Speed_Library:CreateWindow(Config)
       local Title = Title or ""
       local OpenSection = OpenSection or false
   
+      -- Velium: bump the section counter so each section gets a unique
+      -- LayoutOrder (previously every section stayed at 0 and relied on
+      -- insertion order, which is fragile).
+      local _secOrder = CountSection
+      CountSection += 1
+
       local Section = Custom:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 0.999,
         BorderColor3 = Color3.fromRGB(0, 0, 0),
         BorderSizePixel = 0,
         ClipsDescendants = true,
-        LayoutOrder = CountSection,
+        LayoutOrder = _secOrder,
         Size = UDim2.new(1, 0, 0, 30),
         Name = "Section"
       }, ScrolLayers)
@@ -1212,7 +1235,7 @@ function Speed_Library:CreateWindow(Config)
 
         local function UpdateParagraphSize()
           ParagraphContent.TextWrapped = false
-          local lineCount = math.ceil(ParagraphContent.TextBounds.X / math.max(1, ParagraphContent.AbsoluteSize.X))
+          local lineCount = VH_LineCount(ParagraphContent.TextBounds.X, ParagraphContent.AbsoluteSize.X)
 
           ParagraphContent.Size = UDim2.new(1, -16, 0, 12 + (12 * lineCount))
           Paragraph.Size = UDim2.new(1, 0, 0, ParagraphContent.AbsoluteSize.Y + 33)
@@ -1377,7 +1400,7 @@ function Speed_Library:CreateWindow(Config)
 				}, Button)
 
         local function UpdateButtonSize()
-          local _Height = 12 + (12 * (ButtonContent.TextBounds.X // math.max(1, ButtonContent.AbsoluteSize.X)))
+          local _Height = 12 + (12 * VH_LineCount(ButtonContent.TextBounds.X, ButtonContent.AbsoluteSize.X, true))
           ButtonContent.Size = UDim2.new(1, -100, 0, _Height)
           
           Button.Size = UDim2.new(1, 0, 0, ButtonContent.AbsoluteSize.Y + 33)
@@ -1519,9 +1542,9 @@ function Speed_Library:CreateWindow(Config)
 				
         local function UpdateToggleSize()
           ToggleContent.TextWrapped = false
-          local Ratio = ToggleContent.TextBounds.X / math.max(1, ToggleContent.AbsoluteSize.X)
+          local Ratio = VH_LineCount(ToggleContent.TextBounds.X, ToggleContent.AbsoluteSize.X)
 
-          ToggleContent.Size = UDim2.new(1, -100, 0, 12 + (12 * math.ceil(Ratio)))
+          ToggleContent.Size = UDim2.new(1, -100, 0, 12 + (12 * Ratio))
           Toggle.Size = UDim2.new(1, 0, 0, ToggleContent.AbsoluteSize.Y + 33)
           ToggleContent.TextWrapped = true
         end
@@ -1670,7 +1693,7 @@ function Speed_Library:CreateWindow(Config)
 
         local function UpdateSliderSize()
           SliderContent.TextWrapped = false
-          SliderContent.Size = UDim2.new(1, -180, 0, 12 + (12 * math.floor(SliderContent.TextBounds.X / math.max(1, SliderContent.AbsoluteSize.X))))
+          SliderContent.Size = UDim2.new(1, -180, 0, 12 + (12 * VH_LineCount(SliderContent.TextBounds.X, SliderContent.AbsoluteSize.X, true)))
           Slider.Size = UDim2.new(1, 0, 0, SliderContent.AbsoluteSize.Y + 33)
           SliderContent.TextWrapped = true
         end
@@ -1879,8 +1902,8 @@ function Speed_Library:CreateWindow(Config)
         })
 
         local function UpdateInputSize()
-          local Ratio = InputContent.TextBounds.X / math.max(1, InputContent.AbsoluteSize.X)
-          local Calculated = 12 + (12 * math.floor(Ratio))
+          local Ratio = VH_LineCount(InputContent.TextBounds.X, InputContent.AbsoluteSize.X, true)
+          local Calculated = 12 + (12 * Ratio)
 
           InputContent.Size = UDim2.new(1, -180, 0, Calculated)
           Input.Size = UDim2.new(1, 0, 0, InputContent.AbsoluteSize.Y + 33)
@@ -2020,14 +2043,14 @@ function Speed_Library:CreateWindow(Config)
           Parent = Dropdown
         })
         
-				DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // math.max(1, DropdownContent.AbsoluteSize.X))))
-				DropdownContent.TextWrapped = true
-				Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
-        
+        DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * VH_LineCount(DropdownContent.TextBounds.X, DropdownContent.AbsoluteSize.X, true)))
+        DropdownContent.TextWrapped = true
+        Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
+
         DropdownContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
           DropdownContent.TextWrapped = false
             
-					DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // math.max(1, DropdownContent.AbsoluteSize.X))))
+					DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * VH_LineCount(DropdownContent.TextBounds.X, DropdownContent.AbsoluteSize.X, true)))
 					Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
             
           DropdownContent.TextWrapped = true
@@ -2321,10 +2344,16 @@ function Speed_Library:CreateWindow(Config)
   Tabs._Main = Main -- Velium: resize grips attach here
   Tabs._Gui = SpeedHubXGui
   -- Velium: re-measure every tab's sections (call once after all tabs are built).
+  -- Two passes: some labels only report their real TextBounds after the first
+  -- layout pass, so a single pass can leave a section under-sized.
   function Tabs:RefreshAllSections()
-    for _, updaters in pairs(SectionUpdaters) do
-      for _, fn in ipairs(updaters) do pcall(fn) end
+    local function pass()
+      for _, updaters in pairs(SectionUpdaters) do
+        for _, fn in ipairs(updaters) do pcall(fn) end
+      end
     end
+    pass()
+    task.delay(0.4, function() pcall(pass) end)
   end
   return Tabs
 end

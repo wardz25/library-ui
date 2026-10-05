@@ -33,8 +33,11 @@ local function prefetchAwait(key, timeout)
 	end
 	return PREFETCH[key] or nil
 end
-local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua"
-local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua"
+-- Bump this on every push: it cache-busts the inner fetches so a stale
+-- raw-CDN copy of the UI library can never be served to a client.
+local VELIUM_BUILD = "2026-09-16i"
+local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
+local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
 local MUT_URL  = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/mutation.json"
 prefetchRaw("lib", LIB_URL)
@@ -82,7 +85,6 @@ else error("[Velium Hub] Could not load VeliumMainLibrary!") end
 end
 end
 local UI = Library.new()
-local VELIUM_BUILD = "2026-09-16h"
 if not Library.buildPetList then
 Library.buildPetList = function(self, parent, selected, favs, onClick, getKG2, getInventory2, isFav2, sortFn2)
 local T2 = self.T
@@ -1357,20 +1359,75 @@ local tabMisc = speedTabs:CreateTab({"MISC", TAB_ICONS.MISC})
 -- ============================================================
 -- Speed-native item helpers (thin wrappers for terse call sites)
 -- ============================================================
+-- Velium: every helper is wrapped in pcall and returns a harmless stub on
+-- failure. A single malformed item must never abort the rest of a tab's
+-- build (that is what left every non-HATCH tab empty).
+local function spStub()
+	local s = {}
+	function s.Set() end
+	function s.Refresh() end
+	function s.AddOption() end
+	function s.Clear() end
+	s.Value = {}
+	s.Title = { Text = "" }
+	s.Content = { Text = "", TextColor3 = Color3.fromRGB(166,164,160) }
+	-- Real instances so call sites that do `.ButtonButton.Activated:Connect(...)`
+	-- or read `.Frame` do not throw if an item failed to build.
+	local dummy = Instance.new("Frame")
+	dummy.Visible = false
+	s.Frame = dummy
+	s.ButtonButton = Instance.new("TextButton")
+	return s
+end
+local function spGuard(label, fn)
+	local ok, res = pcall(fn)
+	if ok then return res end
+	warn("[Velium Hub] item failed (" .. tostring(label) .. "): " .. tostring(res))
+	return spStub()
+end
 local function spToggle(sec, order, title, content, default, cb)
-	return sec:AddToggle({LayoutOrder=order, Title=title, Content=content or "", Default=default, Callback=cb})
+	return spGuard("toggle:" .. tostring(title), function()
+		return sec:AddToggle({LayoutOrder=order, Title=title, Content=content or "", Default=default, Callback=cb})
+	end)
 end
 local function spInput(sec, order, title, content, default, cb)
-	return sec:AddInput({LayoutOrder=order, Title=title, Content=content or "", Default=default, Callback=cb})
+	return spGuard("input:" .. tostring(title), function()
+		return sec:AddInput({LayoutOrder=order, Title=title, Content=content or "", Default=default, Callback=cb})
+	end)
 end
 local function spButton(sec, order, title, content, icon, cb)
-	return sec:AddButton({LayoutOrder=order, Title=title, Content=content or "", Icon=icon or "", Callback=cb})
+	return spGuard("button:" .. tostring(title), function()
+		return sec:AddButton({LayoutOrder=order, Title=title, Content=content or "", Icon=icon or "", Callback=cb})
+	end)
 end
 local function spDropdown(sec, order, title, content, multi, opts, default, cb)
-	return sec:AddDropdown({LayoutOrder=order, Title=title, Content=content or "", Multi=multi, Options=opts, Default=default or {}, Callback=cb})
+	return spGuard("dropdown:" .. tostring(title), function()
+		return sec:AddDropdown({LayoutOrder=order, Title=title, Content=content or "", Multi=multi, Options=opts, Default=default or {}, Callback=cb})
+	end)
 end
 local function spLabel(sec, order, text)
-	return sec:AddParagraph({LayoutOrder=order, Title=text, Content=""})
+	return spGuard("label:" .. tostring(text), function()
+		return sec:AddParagraph({LayoutOrder=order, Title=text, Content=""})
+	end)
+end
+-- Velium: AddSection is the first call in every tab block; if it throws the
+-- whole tab renders empty. Wrap it and hand back a stub container on failure.
+local function spSection(tab, title, open)
+	local ok, sec = pcall(function() return tab:AddSection(title, open) end)
+	if not ok or not sec then
+		warn("[Velium Hub] section failed (" .. tostring(title) .. "): " .. tostring(sec))
+		local stub = {}
+		function stub.GetContainer()
+			local f = Instance.new("Frame")
+			f.BackgroundTransparency = 1
+			f.Size = UDim2.new(1, 0, 0, 0)
+			f.Visible = false
+			return f
+		end
+		function stub.Resize() end
+		return stub
+	end
+	return sec
 end
 
 -- Team dropdown helper + registry for post-load refresh
@@ -1688,7 +1745,7 @@ end)
 -- ============================================================
 print("[Velium Hub] TAB build: HATCH")
 do
-local hatchSec = tabHatch:AddSection("AUTO HATCH", true)
+local hatchSec = spSection(tabHatch, "AUTO HATCH", true)
 local hatchInner = hatchSec:GetContainer()
 -- ── Egg to place (Speed dropdown, search built in) ──
 do
@@ -1920,7 +1977,7 @@ spOpen = function() ov.Visible=true; rebuild() end
 spUpdate()
 end
 do
-local sellSec = tabHatch:AddSection("SELL SETTINGS", true)
+local sellSec = spSection(tabHatch, "SELL SETTINGS", true)
 local sellInner = sellSec:GetContainer()
 do
 local a
@@ -2031,7 +2088,7 @@ sellOpen = function() sellOverlay.Visible = true; rebuildSellOverlay() end
 refreshSellCount()
 end
 end
-local boostSec = tabHatch:AddSection("PET BOOST", false)
+local boostSec = spSection(tabHatch, "PET BOOST", false)
 local boostInner = boostSec:GetContainer()
 do
 spToggle(boostSec, 1, "Mode 1: Boost selected pets", "Auto-apply toys to the chosen pets", cfg.toggles.mode1boost, function(val)
@@ -2961,6 +3018,7 @@ end
 end
 end
 end
+print("[Velium Hub] TAB done: HATCH")
 -- ============================================================
 -- SHARED GLOBALS FOR EXTERNAL SCRIPTS
 -- (Leveling page removed; outerScroll/PageLeveling assigned later in AUTOMATION tab)
@@ -2994,7 +3052,7 @@ end
 -- ============================================================
 print("[Velium Hub] TAB build: TEAMS")
 do
-local tmSection = tabTeams:AddSection("PET TEAMS", true)
+local tmSection = spSection(tabTeams, "PET TEAMS", true)
 local tmScroll = tmSection:GetContainer()
 
 -- Title
@@ -3353,13 +3411,14 @@ _G._NH_ddRefs = ddRefs
 local okBuild, buildErr = pcall(rebuildTeams)
 if not okBuild then warn("[Velium Hub] rebuildTeams failed: " .. tostring(buildErr)) end
 end
+print("[Velium Hub] TAB done: TEAMS")
 
 -- ============================================================
 -- MISC TAB
 -- ============================================================
 print("[Velium Hub] TAB build: MISC")
 do
-local visSec = tabMisc:AddSection("VISIBILITY", true)
+local visSec = spSection(tabMisc, "VISIBILITY", true)
 local visConnections = {}
 local function hidePart(obj)
 if obj:IsA("BasePart") or obj:IsA("UnionOperation") or obj:IsA("MeshPart") then
@@ -3402,7 +3461,7 @@ cfg.toggles.hideNotif = val; saveConfig()
 end)
 end
 do
-local arSec = tabMisc:AddSection("AUTO RENEW SERVER", true)
+local arSec = spSection(tabMisc, "AUTO RENEW SERVER", true)
 spLabel(arSec, 1, "Job: " .. tostring(game.JobId))
 spLabel(arSec, 2, "Version: " .. tostring(game.PlaceVersion))
 local rsInterval = cfg.misc.rsInterval
@@ -3449,7 +3508,7 @@ end
 end)
 end
 do
-local twSec = tabMisc:AddSection("TRADE WORLD", true)
+local twSec = spSection(tabMisc, "TRADE WORLD", true)
 local statusLabel
 do
 local row = UI:frame(twSec:GetContainer(), UDim2.new(1,0,0,22), nil, T.DARK_CARD)
@@ -3484,7 +3543,7 @@ end
 end)
 end
 do
-local buySec = tabMisc:AddSection("AUTO BUY", true)
+local buySec = spSection(tabMisc, "AUTO BUY", true)
 local buyOv = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
 buyOv.Visible = false; buyOv.ZIndex = 25
 local buyBar = UI:frame(buyOv, UDim2.new(1,0,0,30), nil, T.PANEL)
@@ -3574,7 +3633,7 @@ end
 refreshBuyLbl()
 end
 print("[Velium Hub] Building INTERFACE accordion...")
-local ifSec = tabMisc:AddSection("INTERFACE", true)
+local ifSec = spSection(tabMisc, "INTERFACE", true)
 do
 local scaleNames = {"SMALL", "MEDIUM", "BIG", "MASSIVE"}
 spDropdown(ifSec, 1, "Interface Scale", "Resize the whole hub UI", false, scaleNames, {cfg.uiScale or "MEDIUM"}, function(v)
@@ -3583,13 +3642,14 @@ applyInterfaceScale()
 end)
 end
 print("[Velium Hub] INTERFACE accordion built.")
+print("[Velium Hub] TAB done: MISC")
 
 -- ============================================================
 -- WEBHOOK TAB
 -- ============================================================
 print("[Velium Hub] TAB build: WEBHOOK")
 do
-local whSec = tabWebhook:AddSection("WEBHOOK", true)
+local whSec = spSection(tabWebhook, "WEBHOOK", true)
 
 -- URL input
 spInput(whSec, 1, "Webhook URL", "Paste Discord webhook URL...", cfg.webhook.url or "", function(v)
@@ -3621,20 +3681,21 @@ sendTestWebhook()
 task.delay(2, function() testBtn:Set("Send Test", "Send a test embed to your webhook") end)
 end)
 end
+print("[Velium Hub] TAB done: WEBHOOK")
 
 -- ============================================================
 -- AUTOMATION TAB (hosts Leveling, Nightmare, Elephant, Mutation, Gift)
 -- ============================================================
 print("[Velium Hub] TAB build: AUTOMATION")
 do
-local levelBox = tabAuto:AddSection("LEVELING", true):GetContainer()
-local nightmareBox = tabAuto:AddSection("NIGHTMARE", false):GetContainer()
+local levelBox = spSection(tabAuto, "LEVELING", true):GetContainer()
+local nightmareBox = spSection(tabAuto, "NIGHTMARE", false):GetContainer()
 -- u2500u2500 Placeholder containers for external modules (fixed LayoutOrder) u2500u2500
 _G.HH_Shared.lvContainer = levelBox
 _G.HH_Shared.nmContainer = nightmareBox
 -- ============ AUTO ELEPHANT (moved from old ELEPHANT tab) ============
 do
-local eleSec = tabAuto:AddSection("AUTO ELEPHANT", true)
+local eleSec = spSection(tabAuto, "AUTO ELEPHANT", true)
 local eleInner = eleSec:GetContainer()
 spTeamDD(eleSec, 1, "Select pet team for leveling 1-50", cfg.elephant, "levelingTeam")
 spTeamDD(eleSec, 4, "Select team for elephant", cfg.elephant, "elephantTeam")
@@ -4202,7 +4263,7 @@ task.defer(function() startAutoKG(kgToggle, statusFn, logFn, doneLabel) end)
 end
 end
 -- ============ AUTO MUTATIONS (order 4) ============
-local mutSec = tabAuto:AddSection("AUTO MUTATIONS", false)
+local mutSec = spSection(tabAuto, "AUTO MUTATIONS", false)
 local mutInner = mutSec:GetContainer()
 spToggle(mutSec, 1, "Enable Auto Mutation", "", cfg.toggles.autoMutation, function(val)
 cfg.toggles.autoMutation = val; saveConfig(); VeliumNotify("Auto Mutation", val)
@@ -4386,7 +4447,7 @@ end
 end
 end)
 -- ============ AUTO GIFT PET (order 5) ============
-local giftSec = tabAuto:AddSection("AUTO GIFT PET", false)
+local giftSec = spSection(tabAuto, "AUTO GIFT PET", false)
 local giftInner = giftSec:GetContainer()
 spToggle(giftSec, 1, "Enable Auto Gift", "", cfg.toggles.autoGift, function(val)
 cfg.toggles.autoGift = val; saveConfig(); VeliumNotify("Auto Gift", val)
@@ -4580,6 +4641,7 @@ end
 -- Refresh team dropdowns now that external modules may have registered built-in teams
 pcall(refreshTeamDropdowns)
 end
+print("[Velium Hub] TAB done: AUTOMATION")
 -- ======================== PET BOOST LOOP ========================
 task.spawn(function()
 	local PET_BOOST_INTERVAL = 1
@@ -4624,4 +4686,4 @@ notifyReady = true
 task.defer(function()
 pcall(function() if speedTabs.RefreshAllSections then speedTabs:RefreshAllSections() end end)
 end)
-print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed4.", os.clock() - tStart, VELIUM_BUILD))
+print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed5.", os.clock() - tStart, VELIUM_BUILD))
