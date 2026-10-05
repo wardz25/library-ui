@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16s"
+local VELIUM_BUILD = "2026-09-16t"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -523,7 +523,7 @@ task.spawn(function()
 local ok, err = pcall(function()
 local hasSpecial = embeds and embeds[1] and embeds[1].title and embeds[1].title:find("Special Pet")
 local body = Http:JSONEncode({
-username = LocalPlayer.Name,
+username = "Velium Hub",
 avatar_url = "https://raw.githubusercontent.com/wardz25/library-ui/main/VeliumHub.png",
 content = (hasSpecial and "@everyone") or nil,
 embeds = embeds,
@@ -681,7 +681,7 @@ description = "Webhook Connected!",
 fields = {
 {name = "Status", value = "Online", inline = true},
 {name = "Time", value = os.date("%H:%M:%S"), inline = true},
-{name = "Player", value = LocalPlayer.Name, inline = true},
+{name = "Player", value = "||" .. LocalPlayer.Name .. "||", inline = true},
 },
 footer = {text = "Velium Hub v1"},
 }})
