@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16m"
+local VELIUM_BUILD = "2026-09-16n"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -1489,6 +1489,177 @@ local function refreshTeamDropdowns()
 		ref.dd:Refresh(opts, def)
 	end
 end
+
+-- ============================================================
+-- Dropdown-style "Select ..." picker
+-- The trigger is a row that looks like a Speed dropdown (title on the left,
+-- value box on the right). Clicking it opens ONE compact floating panel
+-- centered on screen -- NOT the old fullscreen overlay -- with a search bar on
+-- top and a large, legible list. Extra detail (Age/KG/mutation/egg) is shown
+-- inline on the right of each row so inventory pickers keep their info.
+-- ============================================================
+local pickerActive
+local pickerPanel, pickerBackdrop, pickerTitle, pickerSearch, pickerList, pickerSelAll
+
+local function pickerShow(v)
+	if pickerBackdrop then pickerBackdrop.Visible = v end
+	if pickerPanel then pickerPanel.Visible = v end
+end
+
+local function pickerFiltered()
+	local q = string.lower((pickerSearch and pickerSearch.Text) or "")
+	local rows = (pickerActive and pickerActive.getRows and pickerActive.getRows()) or {}
+	if q == "" then return rows end
+	local out = {}
+	for _, r in ipairs(rows) do
+		local hay = string.lower(r.search or r.text or "")
+		if hay:find(q, 1, true) then table.insert(out, r) end
+	end
+	return out
+end
+
+local function pickerBuild()
+	if not pickerActive or not pickerList then return end
+	for _, c in ipairs(pickerList:GetChildren()) do
+		if c:IsA("GuiObject") then c:Destroy() end
+	end
+	local shown = pickerFiltered()
+	local n = 0
+	for _, r in ipairs(shown) do
+		n = n + 1
+		local sel = r.selected and true or false
+		local b = UI:button(pickerList, "", UDim2.new(1, 0, 0, 32), nil,
+			sel and T.SEL_BG or Color3.fromRGB(13, 13, 13),
+			sel and T.SEL_TXT or T.TEXT, 13)
+		b.LayoutOrder = n
+		b.TextXAlignment = Enum.TextXAlignment.Left
+		UI:pad(b, 0, 12, 0, 0); UI:corner(b, 5)
+		UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
+		local nm = UI:label(b, r.text or "", UDim2.new(1, -150, 1, 0), UDim2.new(0, 0, 0, 0),
+			sel and T.SEL_TXT or T.TEXT, 13)
+		nm.Font = Enum.Font.GothamBold
+		nm.TextXAlignment = Enum.TextXAlignment.Left
+		nm.TextYAlignment = Enum.TextYAlignment.Center
+		if r.sub and r.sub ~= "" then
+			local sb = UI:label(b, r.sub, UDim2.new(0, 146, 1, 0), UDim2.new(1, -150, 0, 0),
+				T.DIM, 12, Enum.TextXAlignment.Right)
+			sb.Font = Enum.Font.Gotham
+			sb.TextYAlignment = Enum.TextYAlignment.Center
+		end
+		b.MouseButton1Click:Connect(function()
+			if not pickerActive then return end
+			pickerActive.onToggle(r)
+			if pickerActive.closeOnPick then
+				pickerShow(false)
+				if pickerActive.refresh then pickerActive.refresh() end
+			else
+				pickerBuild()
+			end
+		end)
+	end
+	if n == 0 then
+		local e = UI:label(pickerList, "No results", UDim2.new(1, 0, 0, 28), nil, T.DIM, 13)
+		e.LayoutOrder = 1; e.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	if pickerSelAll and pickerActive.selectAll then
+		local allSel = #shown > 0
+		for _, r in ipairs(shown) do if not r.selected then allSel = false; break end end
+		pickerSelAll.Text = allSel and "Unselect All" or "Select All"
+		pickerSelAll.TextColor3 = allSel and T.SEL_TXT or T.ACCENT
+	end
+	if pickerActive.refresh then pickerActive.refresh() end
+end
+
+local function pickerEnsure()
+	if pickerPanel then return end
+	pickerBackdrop = UI:frame(modalRoot, UDim2.new(1, 0, 1, 0), nil, Color3.fromRGB(0, 0, 0), 0.5)
+	pickerBackdrop.Visible = false; pickerBackdrop.ZIndex = 250
+	pickerBackdrop.Name = "VeliumPickerBackdrop"
+	local bdHit = UI:button(pickerBackdrop, "", UDim2.new(1, 0, 1, 0), nil, T.BG, T.TEXT, 10)
+	bdHit.BackgroundTransparency = 1; bdHit.ZIndex = 251
+	bdHit.MouseButton1Click:Connect(function() pickerShow(false) end)
+
+	pickerPanel = UI:frame(modalRoot, UDim2.new(0, 520, 0, 440), UDim2.new(0.5, 0, 0.5, 0), T.PANEL)
+	pickerPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+	pickerPanel.ZIndex = 260; pickerPanel.ClipsDescendants = true
+	pickerPanel.Name = "VeliumPickerPanel"
+	UI:corner(pickerPanel, 10); UI:stroke(pickerPanel, T.ACCENT, 1)
+
+	local hdr = UI:frame(pickerPanel, UDim2.new(1, 0, 0, 42), nil, T.BG)
+	hdr.ZIndex = 261; hdr.Name = "PickerHeader"
+	pickerTitle = UI:label(hdr, "Select", UDim2.new(1, -180, 1, 0), UDim2.new(0, 14, 0, 0), T.ACCENT, 14)
+	pickerTitle.Font = Enum.Font.GothamBold; pickerTitle.ZIndex = 262
+	pickerTitle.TextYAlignment = Enum.TextYAlignment.Center
+	pickerSelAll = UI:button(hdr, "Select All", UDim2.new(0, 100, 0, 28), UDim2.new(1, -136, 0.5, -14), T.BTN, T.ACCENT, 12)
+	pickerSelAll.ZIndex = 262; UI:corner(pickerSelAll, 5); UI:stroke(pickerSelAll, T.ACCENT, 1)
+	pickerSelAll.MouseButton1Click:Connect(function()
+		if not pickerActive or not pickerActive.selectAll then return end
+		pickerActive.selectAll(pickerFiltered())
+		pickerBuild()
+	end)
+	local x = UI:button(hdr, "X", UDim2.new(0, 28, 0, 28), UDim2.new(1, -32, 0.5, -14), T.ERROR, T.TEXT, 13)
+	x.ZIndex = 262; UI:corner(x, 5); UI:stroke(x, T.ERROR, 1)
+	x.MouseButton1Click:Connect(function() pickerShow(false) end)
+
+	pickerSearch = UI:input(pickerPanel, "", "Search pet...", UDim2.new(1, -28, 0, 30), UDim2.new(0, 14, 0, 52))
+	pickerSearch.TextColor3 = T.TEXT; pickerSearch.Font = Enum.Font.GothamBold
+	pickerSearch.TextSize = 13; pickerSearch.ZIndex = 262
+	pickerSearch:GetPropertyChangedSignal("Text"):Connect(function() pickerBuild() end)
+
+	pickerList = UI:scroll(pickerPanel, UDim2.new(1, -28, 1, -100), UDim2.new(0, 14, 0, 92))
+	pickerList.ZIndex = 261
+	UI:list(pickerList, 4); UI:pad(pickerList, 0, 0, 4, 4)
+end
+
+local function pickerOpen(session)
+	pickerEnsure()
+	pickerActive = session
+	local vp = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+	local w = math.clamp(vp.X * 0.42, 360, 560)
+	local h = math.clamp(vp.Y * 0.62, 320, 500)
+	pickerPanel.Size = UDim2.fromOffset(w, h)
+	pickerTitle.Text = session.title or "Select"
+	pickerSearch.Text = ""
+	pickerSearch.PlaceholderText = session.placeholder or "Search pet..."
+	pickerSelAll.Visible = session.selectAll ~= nil
+	pickerShow(true)
+	pickerBuild()
+end
+
+-- Builds a dropdown-looking trigger row in a section and returns a session with
+-- `setValue(text, active)` so call sites can reflect the current selection.
+local function spSelectRow(sec, order, title, cfg)
+	local session = {
+		title = title,
+		placeholder = cfg.placeholder,
+		getRows = cfg.getRows,
+		onToggle = cfg.onToggle,
+		selectAll = cfg.selectAll,
+		closeOnPick = cfg.closeOnPick,
+		refresh = cfg.refresh,
+	}
+	local container = sec:GetContainer()
+	local row = UI:frame(container, UDim2.new(1, 0, 0, 36), nil, Color3.fromRGB(255, 255, 255), 0.935)
+	row.LayoutOrder = order; row.Name = "VeliumSelectRow"
+	UI:corner(row, 4)
+	local tl = UI:label(row, title, UDim2.new(1, -180, 1, 0), UDim2.new(0, 12, 0, 0), Color3.fromRGB(231, 231, 231), 13)
+	tl.Font = Enum.Font.GothamBold
+	tl.TextYAlignment = Enum.TextYAlignment.Center
+	local box = UI:frame(row, UDim2.new(0, 158, 0, 28), UDim2.new(1, -166, 0.5, -14), Color3.fromRGB(255, 255, 255), 0.95)
+	UI:corner(box, 4)
+	local vl = UI:label(box, "Select Options", UDim2.new(1, -16, 1, 0), UDim2.new(0, 8, 0, 0), Color3.fromRGB(255, 255, 255), 12)
+	vl.Font = Enum.Font.GothamBold; vl.TextTransparency = 0.15
+	vl.TextXAlignment = Enum.TextXAlignment.Left; vl.TextYAlignment = Enum.TextYAlignment.Center
+	local hit = UI:button(row, "", UDim2.new(1, 0, 1, 0), nil, T.BTN, T.TEXT, 10)
+	hit.BackgroundTransparency = 1; hit.ZIndex = row.ZIndex + 5
+	hit.MouseButton1Click:Connect(function() pickerOpen(session) end)
+	session.setValue = function(txt, active)
+		vl.Text = (txt ~= nil and txt ~= "") and txt or "Select Options"
+		vl.TextColor3 = active and T.ACCENT or Color3.fromRGB(255, 255, 255)
+		vl.TextTransparency = active and 0 or 0.15
+	end
+	return session
+end
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
@@ -1918,70 +2089,37 @@ if n and n >= 0 then cfg.autoHatch.brontoThresh = n; saveConfig()
 elseif thrInp then thrInp:Set(tostring(cfg.autoHatch.brontoThresh or 4)) end
 end)
 end
-local spCountLbl
+local spSession
 do
-local spOpen
+local function spPets() if not cfg.autoHatch.specialBronto then cfg.autoHatch.specialBronto = {enabled=false, pets={}} end
+if not cfg.autoHatch.specialBronto.pets then cfg.autoHatch.specialBronto.pets = {} end
+return cfg.autoHatch.specialBronto.pets end
 local function spUpdate()
-local cn = 0; if cfg.autoHatch.specialBronto and cfg.autoHatch.specialBronto.pets then
-for _ in pairs(cfg.autoHatch.specialBronto.pets) do cn = cn + 1 end end
-spCountLbl:Set("Select Special Pets", cn == 0 and "NONE" or (cn .. " selected"))
-spCountLbl.Content.TextColor3 = cn == 0 and T.DIM or T.ACCENT
+local cn = 0; for _ in pairs(spPets()) do cn = cn + 1 end
+spSession.setValue(cn == 0 and "" or (cn .. " selected"), cn > 0)
 end
-spCountLbl = spButton(hatchSec, 54, "Select Special Pets", "NONE", "", function() if spOpen then spOpen() end end)
-local ov = UI:frame(PageHatch, UDim2.new(1,0,1,0), nil, T.BG)
-ov.Visible = false; ov.ZIndex = 25
-local oh = UI:frame(ov, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(oh, T.STROKE, 1)
-UI:label(oh, "Select Special Pets to Bronto", UDim2.new(1,-90,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local selAllBtn = UI:button(oh, "Select All", UDim2.new(0,60,0,22), UDim2.new(1,-92,0.5,-11), T.BTN, T.ACCENT, 9)
-UI:stroke(selAllBtn, T.ACCENT, 1)
-local ox = UI:button(oh, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(ox, T.ERROR, 1)
-ox.MouseButton1Click:Connect(function() ov.Visible = false; spUpdate() end)
-local osp = UI:input(ov, "", "Search pet or egg..", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
-osp.TextColor3 = T.TEXT; osp.Font = Enum.Font.Gotham
-local ofr = UI:scroll(ov, UDim2.new(1,0,1,-60), UDim2.new(0,0,0,58))
-UI:list(ofr, 3); UI:pad(ofr, 3,4,4,3)
-local function rebuild()
-for _, c in ipairs(ofr:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local q = string.lower(osp.Text)
-local filtered = {}
+spSession = spSelectRow(hatchSec, 54, "Select Special Pets", {
+placeholder = "Search pet or egg...",
+getRows = function()
+local pets = spPets(); local rows = {}
 for _, pet in ipairs(PetJSON) do
-if q ~= "" and not string.lower(pet.name):find(q,1,true) and not string.lower(pet.egg or ""):find(q,1,true) then continue end
-table.insert(filtered, pet) end
-local n = 0
-for _, pet in ipairs(filtered) do
-n = n + 1
-local sel = cfg.autoHatch.specialBronto and cfg.autoHatch.specialBronto.pets and cfg.autoHatch.specialBronto.pets[pet.name]==true
-local b = UI:button(ofr, " ", UDim2.new(1,0,0,34), nil, sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,2,0); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
-local nm = UI:label(b, pet.name, UDim2.new(1,0,0,16), UDim2.new(0,0,0,2), sel and T.SEL_TXT or T.TEXT, 10)
-nm.Font = Enum.Font.GothamBold; nm.TextXAlignment = Enum.TextXAlignment.Left
-local eg = UI:label(b, pet.egg or "", UDim2.new(1,0,0,14), UDim2.new(0,0,0,18), T.DIM, 8)
-eg.TextXAlignment = Enum.TextXAlignment.Left
-b.MouseButton1Click:Connect(function()
-if not cfg.autoHatch.specialBronto then cfg.autoHatch.specialBronto = {enabled=false, pets={}} end
-if not cfg.autoHatch.specialBronto.pets then cfg.autoHatch.specialBronto.pets = {} end
-if cfg.autoHatch.specialBronto.pets[pet.name] then cfg.autoHatch.specialBronto.pets[pet.name]=nil
-else cfg.autoHatch.specialBronto.pets[pet.name]=true end
-saveConfig(); rebuild() end) end
+table.insert(rows, {id = pet.name, text = pet.name, sub = pet.egg or "", search = pet.name .. " " .. (pet.egg or ""), selected = pets[pet.name] == true})
 end
-local function selectAllFiltered()
-if not cfg.autoHatch.specialBronto then cfg.autoHatch.specialBronto = {enabled=false, pets={}} end
-if not cfg.autoHatch.specialBronto.pets then cfg.autoHatch.specialBronto.pets = {} end
-local q = string.lower(osp.Text)
-local allSel = true
-for _, pet in ipairs(PetJSON) do
-if q ~= "" and not string.lower(pet.name):find(q,1,true) and not string.lower(pet.egg or ""):find(q,1,true) then continue end
-if not cfg.autoHatch.specialBronto.pets[pet.name] then allSel = false; break end end
-for _, pet in ipairs(PetJSON) do
-if q ~= "" and not string.lower(pet.name):find(q,1,true) and not string.lower(pet.egg or ""):find(q,1,true) then continue end
-cfg.autoHatch.specialBronto.pets[pet.name] = not allSel end
-saveConfig(); rebuild() end
-selAllBtn.MouseButton1Click:Connect(selectAllFiltered)
-osp:GetPropertyChangedSignal("Text"):Connect(rebuild)
-spOpen = function() ov.Visible=true; rebuild() end
+return rows
+end,
+onToggle = function(r)
+local pets = spPets()
+if pets[r.id] then pets[r.id] = nil else pets[r.id] = true end
+saveConfig(); spUpdate()
+end,
+selectAll = function(shown)
+local pets = spPets(); local allSel = #shown > 0
+for _, r in ipairs(shown) do if not pets[r.id] then allSel = false; break end end
+for _, r in ipairs(shown) do pets[r.id] = allSel and nil or true end
+saveConfig(); spUpdate()
+end,
+refresh = spUpdate,
+})
 spUpdate()
 end
 do
@@ -2015,84 +2153,36 @@ spToggle(sellSec, 9, "Enable Selling", "", cfg.autoHatch.sellEnabled ~= false, f
 cfg.autoHatch.sellEnabled = val; saveConfig()
 end)
 end
--- ── Sell-pet picker (custom overlay, kept) ──
-local sellCount = 0
-for _ in pairs(cfg.autoHatch.sellPets or {}) do sellCount = sellCount + 1 end
-local sellLbl
+-- ── Sell-pet picker ──
+local sellSession
 do
-local sellOpen
+local function sellPets() if not cfg.autoHatch.sellPets then cfg.autoHatch.sellPets = {} end return cfg.autoHatch.sellPets end
 local function refreshSellCount()
-sellCount = 0; for _ in pairs(cfg.autoHatch.sellPets or {}) do sellCount = sellCount + 1 end
-sellLbl:Set("Select Pets to Sell", sellCount == 0 and "NONE" or (sellCount .. " selected"))
-sellLbl.Content.TextColor3 = sellCount == 0 and T.DIM or T.ACCENT
+local n = 0; for _ in pairs(sellPets()) do n = n + 1 end
+sellSession.setValue(n == 0 and "" or (n .. " selected"), n > 0)
 end
-sellLbl = spButton(sellSec, 10, "Select Pets to Sell", "NONE", "", function() if sellOpen then sellOpen() end end)
-local sellOverlay = UI:frame(PageHatch, UDim2.new(1,0,1,0), nil, T.BG)
-sellOverlay.Visible = false; sellOverlay.ZIndex = 25
-local soBar = UI:frame(sellOverlay, UDim2.new(1,0,0,26), nil, T.PANEL)
-UI:stroke(soBar, T.STROKE, 1)
-UI:label(soBar, "Select pets to SELL", UDim2.new(1,-96,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local soSelAll = UI:button(soBar, "Select All", UDim2.new(0,64,0,20), UDim2.new(1,-92,0.5,-10), T.BTN, T.ACCENT, 8)
-UI:stroke(soSelAll, T.STROKE, 1)
-local soClose = UI:button(soBar, "X", UDim2.new(0,24,0,20), UDim2.new(1,-28,0.5,-10), T.ERROR, T.TEXT, 10)
-UI:stroke(soClose, T.ERROR, 1)
-soClose.MouseButton1Click:Connect(function() sellOverlay.Visible = false; refreshSellCount() end)
-local soSearch = UI:input(sellOverlay, "", "Search pet or egg...",
-UDim2.new(1,-8,0,22), UDim2.new(0,4,0,28))
-soSearch.TextColor3 = T.TEXT; soSearch.Font = Enum.Font.Gotham
-local soSF = UI:scroll(sellOverlay, UDim2.new(1,0,1,-56), UDim2.new(0,0,0,54))
-UI:list(soSF, 3); UI:pad(soSF, 3,4,4,3)
-local function getFilteredPets()
-local q = string.lower(soSearch.Text)
-local result = {}
+sellSession = spSelectRow(sellSec, 10, "Select Pets to Sell", {
+placeholder = "Search pet or egg...",
+getRows = function()
+local pets = sellPets(); local rows = {}
 for _, pet in ipairs(PetJSON) do
-if q == "" or pet.name:lower():find(q,1,true) or (pet.egg or ""):lower():find(q,1,true) then
-table.insert(result, pet)
+table.insert(rows, {id = pet.name, text = pet.name, sub = pet.egg or "", search = pet.name .. " " .. (pet.egg or ""), selected = pets[pet.name] == true})
 end
-end
-return result
-end
-local function rebuildSellOverlay()
-for _, c in ipairs(soSF:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local filtered = getFilteredPets()
-local allSelected = #filtered > 0
-for _, pet in ipairs(filtered) do
-if not (cfg.autoHatch.sellPets or {})[pet.name] then allSelected = false; break end
-end
-soSelAll.Text = #filtered == 0 and "Select All" or (allSelected and "Unselect All" or "Select All")
-for i, pet in ipairs(filtered) do
-local isSel = (cfg.autoHatch.sellPets or {})[pet.name] == true
-local b = UI:button(soSF, pet.name, UDim2.new(1,0,0,30), nil,
-(isSel and T.SEL_BG) or Color3.fromRGB(13,13,13),
-(isSel and T.SEL_TXT) or T.TEXT, 10)
-b.LayoutOrder = i; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b, 0,8,4,0); UI:corner(b, 5)
-UI:stroke(b, (isSel and T.ACCENT) or T.STROKE, 1)
-local sub = UI:label(b, pet.egg or "", UDim2.new(1,-8,0,12), UDim2.new(0,8,1,-13),
-(isSel and Color3.fromRGB(60,40,0)) or T.DIM, 8)
-sub.Font = Enum.Font.Gotham
-b.MouseButton1Click:Connect(function()
-if not cfg.autoHatch.sellPets then cfg.autoHatch.sellPets = {} end
-if cfg.autoHatch.sellPets[pet.name] then cfg.autoHatch.sellPets[pet.name] = nil
-else cfg.autoHatch.sellPets[pet.name] = true end
-saveConfig(); refreshSellCount(); rebuildSellOverlay()
-end)
-end
-end
-soSelAll.MouseButton1Click:Connect(function()
-if not cfg.autoHatch.sellPets then cfg.autoHatch.sellPets = {} end
-local filtered = getFilteredPets()
-local allSel = true
-for _, pet in ipairs(filtered) do
-if not cfg.autoHatch.sellPets[pet.name] then allSel = false; break end
-end
-for _, pet in ipairs(filtered) do
-cfg.autoHatch.sellPets[pet.name] = allSel and nil or true
-end
-saveConfig(); refreshSellCount(); rebuildSellOverlay()
-end)
-soSearch:GetPropertyChangedSignal("Text"):Connect(rebuildSellOverlay)
-sellOpen = function() sellOverlay.Visible = true; rebuildSellOverlay() end
+return rows
+end,
+onToggle = function(r)
+local pets = sellPets()
+if pets[r.id] then pets[r.id] = nil else pets[r.id] = true end
+saveConfig(); refreshSellCount()
+end,
+selectAll = function(shown)
+local pets = sellPets(); local allSel = #shown > 0
+for _, r in ipairs(shown) do if not pets[r.id] then allSel = false; break end end
+for _, r in ipairs(shown) do pets[r.id] = allSel and nil or true end
+saveConfig(); refreshSellCount()
+end,
+refresh = refreshSellCount,
+})
 refreshSellCount()
 end
 end
@@ -2115,69 +2205,36 @@ for _, name in ipairs(v) do newOpts[name] = true end
 cfg.petboost.mode1.boostOptions = newOpts
 saveConfig()
 end)
--- ── Boost pet picker (custom overlay, kept) ──
-local spCount = 0
-for _ in pairs(cfg.petboost.mode1.selPets or {}) do spCount = spCount + 1 end
-local spLbl
+-- ── Boost pet picker ──
+local boostSelSession
 do
-local spOpen
+local function boostPets() if not cfg.petboost.mode1.selPets then cfg.petboost.mode1.selPets = {} end return cfg.petboost.mode1.selPets end
 local function refreshSpCount()
-local cn = 0; for _ in pairs(cfg.petboost.mode1.selPets or {}) do cn = cn + 1 end
-spLbl:Set("Select Pets to Boost", cn == 0 and "ALL (no filter)" or (cn .. " selected"))
-spLbl.Content.TextColor3 = cn == 0 and T.DIM or T.ACCENT
+local n = 0; for _ in pairs(boostPets()) do n = n + 1 end
+boostSelSession.setValue(n == 0 and "ALL (no filter)" or (n .. " selected"), n > 0)
 end
-spLbl = spButton(boostSec, 3, "Select Pets to Boost", "ALL (no filter)", "", function() if spOpen then spOpen() end end)
-local spOv = UI:frame(PageHatch, UDim2.new(1,0,1,0), nil, T.BG)
-spOv.Visible = false; spOv.ZIndex = 25
-local spBar = UI:frame(spOv, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(spBar, T.STROKE, 1)
-UI:label(spBar, "Select Pets to Boost", UDim2.new(1,-90,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local spSelAll = UI:button(spBar, "All", UDim2.new(0,40,0,22), UDim2.new(1,-92,0.5,-11), T.BTN, T.ACCENT, 9)
-UI:stroke(spSelAll, T.ACCENT, 1)
-local spX = UI:button(spBar, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(spX, T.ERROR, 1)
-spX.MouseButton1Click:Connect(function()
-spOv.Visible = false
-refreshSpCount()
-end)
-local spSearch = UI:input(spOv, "", "Search pet..", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
-spSearch.TextColor3 = T.TEXT; spSearch.Font = Enum.Font.Gotham
-local spSF = UI:scroll(spOv, UDim2.new(1,0,1,-60), UDim2.new(0,0,0,58))
-UI:list(spSF, 3); UI:pad(spSF, 3,4,4,3)
-local function rebuildSpOverlay()
-for _, c in ipairs(spSF:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local q = string.lower(spSearch.Text)
-local n = 0
+boostSelSession = spSelectRow(boostSec, 3, "Select Pets to Boost", {
+placeholder = "Search pet...",
+getRows = function()
+local pets = boostPets(); local rows = {}
 for _, pet in ipairs(PetJSON) do
-if q ~= "" and not string.lower(pet.name):find(q,1,true) then continue end
-n = n + 1
-local sel = cfg.petboost.mode1.selPets and cfg.petboost.mode1.selPets[pet.name] == true
-local b = UI:button(spSF, pet.name, UDim2.new(1,0,0,30), nil,
-sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,2,0); UI:corner(b,5); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
-local sub = UI:label(b, pet.egg or "", UDim2.new(1,-8,0,11), UDim2.new(0,8,1,-12),
-sel and Color3.fromRGB(60,40,0) or T.DIM, 8)
-sub.Font = Enum.Font.Gotham
-b.MouseButton1Click:Connect(function()
-if not cfg.petboost.mode1.selPets then cfg.petboost.mode1.selPets = {} end
-if cfg.petboost.mode1.selPets[pet.name] then cfg.petboost.mode1.selPets[pet.name] = nil
-else cfg.petboost.mode1.selPets[pet.name] = true end
-saveConfig()
-end)
+table.insert(rows, {id = pet.name, text = pet.name, sub = pet.egg or "", search = pet.name .. " " .. (pet.egg or ""), selected = pets[pet.name] == true})
 end
-end
-spSearch:GetPropertyChangedSignal("Text"):Connect(rebuildSpOverlay)
-spSelAll.MouseButton1Click:Connect(function()
-if not cfg.petboost.mode1.selPets then cfg.petboost.mode1.selPets = {} end
-local allSel = true
-for _, pet in ipairs(PetJSON) do
-if not cfg.petboost.mode1.selPets[pet.name] then allSel = false; break end end
-for _, pet in ipairs(PetJSON) do
-cfg.petboost.mode1.selPets[pet.name] = allSel and nil or true end
-saveConfig()
-end)
-spOpen = function() spOv.Visible = true; rebuildSpOverlay() end
+return rows
+end,
+onToggle = function(r)
+local pets = boostPets()
+if pets[r.id] then pets[r.id] = nil else pets[r.id] = true end
+saveConfig(); refreshSpCount()
+end,
+selectAll = function(shown)
+local pets = boostPets(); local allSel = #shown > 0
+for _, r in ipairs(shown) do if not pets[r.id] then allSel = false; break end end
+for _, r in ipairs(shown) do pets[r.id] = allSel and nil or true end
+saveConfig(); refreshSpCount()
+end,
+refresh = refreshSpCount,
+})
 refreshSpCount()
 end
 spToggle(boostSec, 10, "Mode 2: Boost pet pairs", "Pairs: pet + toy type. Auto-apply boost when ready.", cfg.toggles.mode2boost, function(val)
@@ -3552,93 +3609,53 @@ end)
 end
 do
 local buySec = spSection(tabMisc, "AUTO BUY", true)
-local buyOv = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-buyOv.Visible = false; buyOv.ZIndex = 25
-local buyBar = UI:frame(buyOv, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(buyBar, T.STROKE, 1)
-local buyTitle = UI:label(buyBar, "Select items", UDim2.new(1,-100,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local buyAllBtn = UI:button(buyBar, "All", UDim2.new(0,40,0,22), UDim2.new(1,-92,0.5,-11), T.BTN, T.ACCENT, 9)
-UI:stroke(buyAllBtn, T.ACCENT, 1)
-local buyX = UI:button(buyBar, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(buyX, T.ERROR, 1)
-local buySearch = UI:input(buyOv, "", "Search...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
-buySearch.TextColor3 = T.TEXT
-local buySF = UI:scroll(buyOv, UDim2.new(1,0,1,-60), UDim2.new(0,0,0,58))
-UI:list(buySF, 3); UI:pad(buySF, 3,4,4,3)
-local buyKind, buyKindDK = "egg", "PetEggData"
-local buyLbls = {}
-local function refreshBuyLbl()
-for k, btn in pairs(buyLbls) do
-local st = cfg.autoBuy and cfg.autoBuy[k]
-local n = 0
-if st and st.items then for _ in pairs(st.items) do n = n + 1 end end
-local txt = n == 0 and "NONE" or (n .. " selected")
-btn:Set(nil, txt)
-btn.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
-end
-end
-local function rebuildBuy()
-for _, c in ipairs(buySF:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local q = string.lower(buySearch.Text)
-local st = cfg.autoBuy and cfg.autoBuy[buyKind]
-if not st then return end
-if not st.items then st.items = {} end
-local n = 0
-for _, name in ipairs(BuySys.getBuyItemList(buyKindDK)) do
-if q ~= "" and not string.lower(name):find(q, 1, true) then continue end
-n = n + 1
-local sel = st.items[name] == true
-local b = UI:button(buySF, name, UDim2.new(1,0,0,26), nil,
-sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b, 0, 8, 2, 0); UI:corner(b, 5); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
-local nm = name
-b.MouseButton1Click:Connect(function()
-if st.items[nm] then st.items[nm] = nil else st.items[nm] = true end
-saveConfig(); refreshBuyLbl(); rebuildBuy()
-end)
-end
-end
-local function openBuyPicker(kind, title, dk)
-buyKind, buyKindDK = kind, dk
-buyTitle.Text = title
-buySearch.Text = ""
-rebuildBuy()
-buyOv.Visible = true
-end
-buyX.MouseButton1Click:Connect(function() buyOv.Visible = false; refreshBuyLbl() end)
-buySearch:GetPropertyChangedSignal("Text"):Connect(rebuildBuy)
-buyAllBtn.MouseButton1Click:Connect(function()
-local st = cfg.autoBuy and cfg.autoBuy[buyKind]
-if not st then return end
-if not st.items then st.items = {} end
-local allSel = true
-for _, name in ipairs(BuySys.getBuyItemList(buyKindDK)) do
-if not st.items[name] then allSel = false; break end
-end
-for _, name in ipairs(BuySys.getBuyItemList(buyKindDK)) do
-st.items[name] = allSel and nil or true
-end
-saveConfig(); refreshBuyLbl(); rebuildBuy()
-end)
 local buySpecs = {
 {key = "seed", label = "Auto Buy Seeds", pick = "Seeds", dk = "SeedData"},
 {key = "egg", label = "Auto Buy Eggs", pick = "Eggs", dk = "PetEggData"},
 {key = "gear", label = "Auto Buy Gears", pick = "Gears", dk = "GearData"},
 }
+local buySessions = {}
+local function buyItems(kk)
+if not cfg.autoBuy[kk] then cfg.autoBuy[kk] = {on=false, items={}} end
+if not cfg.autoBuy[kk].items then cfg.autoBuy[kk].items = {} end
+return cfg.autoBuy[kk].items
+end
+local function refreshBuyLbl(kk)
+local s = buySessions[kk]
+if not s then return end
+local n = 0; for _ in pairs(buyItems(kk)) do n = n + 1 end
+s.setValue(n == 0 and "" or (n .. " selected"), n > 0)
+end
 for bi, spec in ipairs(buySpecs) do
 local kk = spec.key
 if not cfg.autoBuy[kk] then cfg.autoBuy[kk] = {on=false, items={}} end
 spToggle(buySec, bi * 2 - 1, spec.label, "", cfg.autoBuy[kk].on, function(val)
 cfg.autoBuy[kk].on = val; saveConfig()
 end)
-local dk2, tt2 = spec.dk, "Select " .. spec.pick
-local selBtn = spButton(buySec, bi * 2, "Select " .. spec.pick, "NONE", "", function()
-openBuyPicker(kk, tt2, dk2)
-end)
-buyLbls[kk] = selBtn
+buySessions[kk] = spSelectRow(buySec, bi * 2, "Select " .. spec.pick, {
+placeholder = "Search " .. string.lower(spec.pick) .. "...",
+getRows = function()
+local items = buyItems(kk); local rows = {}
+for _, name in ipairs(BuySys.getBuyItemList(spec.dk)) do
+table.insert(rows, {id = name, text = name, sub = "", search = name, selected = items[name] == true})
 end
-refreshBuyLbl()
+return rows
+end,
+onToggle = function(r)
+local items = buyItems(kk)
+if items[r.id] then items[r.id] = nil else items[r.id] = true end
+saveConfig(); refreshBuyLbl(kk)
+end,
+selectAll = function(shown)
+local items = buyItems(kk); local allSel = #shown > 0
+for _, r in ipairs(shown) do if not items[r.id] then allSel = false; break end end
+for _, r in ipairs(shown) do items[r.id] = allSel and nil or true end
+saveConfig(); refreshBuyLbl(kk)
+end,
+refresh = function() refreshBuyLbl(kk) end,
+})
+refreshBuyLbl(kk)
+end
 end
 print("[Velium Hub] Building INTERFACE accordion...")
 local ifSec = spSection(tabMisc, "INTERFACE", true)
@@ -3731,101 +3748,89 @@ end
 spToggle(eleSec, 13, "Extra Filler Pets (swap saat capai threshold)", "", cfg.elephant.useExtraPets or false, function(val)
 cfg.elephant.useExtraPets = val; saveConfig()
 end)
-local efCountLbl
+local efSession
 do
-local efOpen
+local function efPets() if not cfg.elephant.extraPets then cfg.elephant.extraPets = {} end return cfg.elephant.extraPets end
 local function efUpdate()
-local n = 0; for _ in pairs(cfg.elephant.extraPets) do n = n + 1 end
-local txt = n == 0 and "NONE" or (n .. " selected")
-efCountLbl:Set("Select Extra Filler Pets", txt)
-efCountLbl.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
+local n = 0; for _ in pairs(efPets()) do n = n + 1 end
+efSession.setValue(n == 0 and "" or (n .. " selected"), n > 0)
 end
-efCountLbl = spButton(eleSec, 14, "Select Extra Filler Pets", "NONE", "", function() if efOpen then efOpen() end end)
-local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-ov.Visible = false; ov.ZIndex = 20
-local oh = UI:frame(ov, UDim2.new(1,0,0,26), nil, T.PANEL)
-UI:stroke(oh, T.STROKE, 1)
-UI:label(oh, "Select Extra Filler Pets", UDim2.new(1,-36,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local ox = UI:button(oh, "X", UDim2.new(0,24,0,20), UDim2.new(1,-28,0.5,-10), T.ERROR, T.TEXT, 10)
-UI:stroke(ox, T.ERROR, 1)
-ox.MouseButton1Click:Connect(function() ov.Visible = false; efUpdate() end)
-local oSearch = UI:input(ov, "", "Search pet...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,28))
-oSearch.TextColor3 = T.TEXT; oSearch.Font = Enum.Font.Gotham
-local ofr = UI:scroll(ov, UDim2.new(1,0,1,-56), UDim2.new(0,0,0,54))
-UI:list(ofr, 3); UI:pad(ofr, 3,4,4,3)
-local function rebuild()
-for _, c in ipairs(ofr:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local inv = getInventory(); local q = string.lower(oSearch.Text)
-local us = {}; for u in pairs(inv) do table.insert(us, u) end
+efSession = spSelectRow(eleSec, 14, "Select Extra Filler Pets", {
+placeholder = "Search pet...",
+getRows = function()
+local inv = getInventory(); local pets = efPets(); local us = {}
+for u in pairs(inv) do table.insert(us, u) end
 table.sort(us, function(a,b) return getKG(a) > getKG(b) end)
-local n = 0
+local rows = {}
 for _, uuid in ipairs(us) do
 local pet = inv[uuid]
-if not pet then continue end
-if q ~= "" and not string.lower(pet.PetType or ""):find(q,1,true) then continue end
-if table.find(cfg.targets, uuid) then continue end
-local sel = cfg.elephant.extraPets[uuid] == true
-local txt = string.format("%s | Age %d | %.2f KG", pet.PetType or "?", getAge(uuid), getKG(uuid))
-local b = UI:button(ofr, txt, UDim2.new(1,0,0,22), nil, sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,4,0); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-if cfg.elephant.extraPets[uuid] then cfg.elephant.extraPets[uuid] = nil else cfg.elephant.extraPets[uuid] = true end
-saveConfig(); efUpdate(); rebuild() end)
-n = n + 1 end
+if pet and not table.find(cfg.targets, uuid) then
+local mut = getMutName(uuid)
+local ms = (mut ~= "" and (" [" .. mut .. "]")) or ""
+table.insert(rows, {id = uuid, text = pet.PetType or "?",
+sub = string.format("Age %d | %.2f KG", getAge(uuid), getKG(uuid)),
+search = (pet.PetType or "") .. ms, selected = pets[uuid] == true})
 end
-oSearch:GetPropertyChangedSignal("Text"):Connect(rebuild)
-efOpen = function() ov.Visible = true; rebuild() end
+end
+return rows
+end,
+onToggle = function(r)
+local pets = efPets()
+if pets[r.id] then pets[r.id] = nil else pets[r.id] = true end
+saveConfig(); efUpdate()
+end,
+selectAll = function(shown)
+local pets = efPets(); local allSel = #shown > 0
+for _, r in ipairs(shown) do if not pets[r.id] then allSel = false; break end end
+for _, r in ipairs(shown) do pets[r.id] = allSel and nil or true end
+saveConfig(); efUpdate()
+end,
+refresh = efUpdate,
+})
 efUpdate()
 end
 spToggle(eleSec, 15, "Extra Ele Filler Pets (swap saat capai target KG)", "", cfg.elephant.useExtraElePets or false, function(val)
 cfg.elephant.useExtraElePets = val; saveConfig()
 end)
-local eefCountLbl
+local eefSession
 do
-local eefOpen
+local function eefPets() if not cfg.elephant.extraElePets then cfg.elephant.extraElePets = {} end return cfg.elephant.extraElePets end
 local function eefUpdate()
-local n = 0; for _ in pairs(cfg.elephant.extraElePets) do n = n + 1 end
-local txt = n == 0 and "NONE" or (n .. " selected")
-eefCountLbl:Set("Select Extra Ele Filler Pets", txt)
-eefCountLbl.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
+local n = 0; for _ in pairs(eefPets()) do n = n + 1 end
+eefSession.setValue(n == 0 and "" or (n .. " selected"), n > 0)
 end
-eefCountLbl = spButton(eleSec, 16, "Select Extra Ele Filler Pets", "NONE", "", function() if eefOpen then eefOpen() end end)
-local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-ov.Visible = false; ov.ZIndex = 20
-local oh = UI:frame(ov, UDim2.new(1,0,0,26), nil, T.PANEL)
-UI:stroke(oh, T.STROKE, 1)
-UI:label(oh, "Select Extra Ele Filler Pets", UDim2.new(1,-36,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local ox = UI:button(oh, "X", UDim2.new(0,24,0,20), UDim2.new(1,-28,0.5,-10), T.ERROR, T.TEXT, 10)
-UI:stroke(ox, T.ERROR, 1)
-ox.MouseButton1Click:Connect(function() ov.Visible = false; eefUpdate() end)
-local oSearch2 = UI:input(ov, "", "Search pet...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,28))
-oSearch2.TextColor3 = T.TEXT; oSearch2.Font = Enum.Font.Gotham
-local ofr = UI:scroll(ov, UDim2.new(1,0,1,-56), UDim2.new(0,0,0,54))
-UI:list(ofr, 3); UI:pad(ofr, 3,4,4,3)
-local function rebuild()
-for _, c in ipairs(ofr:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local inv = getInventory(); local q = string.lower(oSearch2.Text)
-local us = {}; for u in pairs(inv) do table.insert(us, u) end
+eefSession = spSelectRow(eleSec, 16, "Select Extra Ele Filler Pets", {
+placeholder = "Search pet...",
+getRows = function()
+local inv = getInventory(); local pets = eefPets(); local us = {}
+for u in pairs(inv) do table.insert(us, u) end
 table.sort(us, function(a,b) return getKG(a) > getKG(b) end)
-local n = 0
+local rows = {}
 for _, uuid in ipairs(us) do
 local pet = inv[uuid]
-if not pet then continue end
-if q ~= "" and not string.lower(pet.PetType or ""):find(q,1,true) then continue end
-if table.find(cfg.targets, uuid) then continue end
-local sel = cfg.elephant.extraElePets[uuid] == true
-local txt = string.format("%s | Age %d | %.2f KG", pet.PetType or "?", getAge(uuid), getKG(uuid))
-local b = UI:button(ofr, txt, UDim2.new(1,0,0,22), nil, sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,4,0); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-if cfg.elephant.extraElePets[uuid] then cfg.elephant.extraElePets[uuid] = nil else cfg.elephant.extraElePets[uuid] = true end
-saveConfig(); eefUpdate(); rebuild() end)
-n = n + 1 end
+if pet and not table.find(cfg.targets, uuid) then
+local mut = getMutName(uuid)
+local ms = (mut ~= "" and (" [" .. mut .. "]")) or ""
+table.insert(rows, {id = uuid, text = pet.PetType or "?",
+sub = string.format("Age %d | %.2f KG", getAge(uuid), getKG(uuid)),
+search = (pet.PetType or "") .. ms, selected = pets[uuid] == true})
 end
-oSearch2:GetPropertyChangedSignal("Text"):Connect(rebuild)
-eefOpen = function() ov.Visible = true; rebuild() end
+end
+return rows
+end,
+onToggle = function(r)
+local pets = eefPets()
+if pets[r.id] then pets[r.id] = nil else pets[r.id] = true end
+saveConfig(); eefUpdate()
+end,
+selectAll = function(shown)
+local pets = eefPets(); local allSel = #shown > 0
+for _, r in ipairs(shown) do if not pets[r.id] then allSel = false; break end end
+for _, r in ipairs(shown) do pets[r.id] = allSel and nil or true end
+saveConfig(); eefUpdate()
+end,
+refresh = eefUpdate,
+})
 eefUpdate()
 end
 spToggle(eleSec, 20, "[ Optional ] Phase 2 team (X - 100)", "", cfg.elephant.phase2Enabled, function(val)
@@ -3856,75 +3861,47 @@ if val and val >= 1 then cfg.elephant.levelThreshold = val; saveConfig()
 elseif mlInp then mlInp:Set(tostring(cfg.elephant.levelThreshold)) end
 end)
 end
-local tgtCountLabel
+local tgtSession
 local function setTgtCount()
-local n = #cfg.targets
-tgtCountLabel:Set("Select Target Pets", "Target pets: " .. n)
-tgtCountLabel.Content.TextColor3 = n == 0 and T.DIM or T.ACCENT
+tgtSession.setValue("Target pets: " .. #cfg.targets, #cfg.targets > 0)
 end
 do
-local tgtOpen
-tgtCountLabel = spButton(eleSec, 36, "Select Target Pets", "Target pets: 0", "", function() if tgtOpen then tgtOpen() end end)
-local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-ov.Visible = false; ov.ZIndex = 20
-local oh = UI:frame(ov, UDim2.new(1,0,0,26), nil, T.PANEL)
-UI:stroke(oh, T.STROKE, 1)
-UI:label(oh, "Select Target Pets", UDim2.new(1,-80,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local sa = UI:button(oh, "Select All", UDim2.new(0,64,0,20), UDim2.new(1,-118,0.5,-10), T.BTN, T.ACCENT, 8)
-UI:stroke(sa, T.STROKE, 1)
-local ox = UI:button(oh, "X", UDim2.new(0,24,0,20), UDim2.new(1,-28,0.5,-10), T.ERROR, T.TEXT, 10)
-UI:stroke(ox, T.ERROR, 1)
-ox.MouseButton1Click:Connect(function() ov.Visible = false; setTgtCount() end)
-local oSearch3 = UI:input(ov, "", "Search pet name...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,28))
-oSearch3.TextColor3 = T.TEXT; oSearch3.Font = Enum.Font.Gotham
-local ofr = UI:scroll(ov, UDim2.new(1,0,1,-56), UDim2.new(0,0,0,54))
-UI:list(ofr, 3); UI:pad(ofr, 3,4,4,3)
-local function rebuild()
-for _, c in ipairs(ofr:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local inv = getInventory(); local q = string.lower(oSearch3.Text)
-local us = {}; for u in pairs(inv) do table.insert(us, u) end
+tgtSession = spSelectRow(eleSec, 36, "Select Target Pets", {
+placeholder = "Search pet name...",
+getRows = function()
+local inv = getInventory(); local us = {}
+for u in pairs(inv) do table.insert(us, u) end
 table.sort(us, function(a,b) return getKG(a) > getKG(b) end)
-local allSel = true
-for _, uuid in ipairs(us) do
-if not table.find(cfg.targets, uuid) then allSel = false; break end
-end
-sa.Text = allSel and "None" or "Select All"
-local n = 0
+local rows = {}
 for _, uuid in ipairs(us) do
 local pet = inv[uuid]
-if not pet then continue end
-if q ~= "" and not string.lower(pet.PetType or ""):find(q,1,true) then continue end
-local sel = table.find(cfg.targets, uuid) ~= nil
+if pet then
 local mut = getMutName(uuid)
 local ms = (mut ~= "" and (" [" .. mut .. "]")) or ""
-local txt = string.format("%s%s | Age %d | %.2f KG", pet.PetType or "?", ms, getAge(uuid), getKG(uuid))
-local b = UI:button(ofr, txt, UDim2.new(1,0,0,22), nil, sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,4,0); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-local i = table.find(cfg.targets, uuid)
-if i then table.remove(cfg.targets, i) else table.insert(cfg.targets, uuid) end
-saveConfig(); setTgtCount(); rebuild() end)
-n = n + 1 end
+table.insert(rows, {id = uuid, text = pet.PetType or "?",
+sub = string.format("Age %d | %.2f KG", getAge(uuid), getKG(uuid)),
+search = (pet.PetType or "") .. ms, selected = table.find(cfg.targets, uuid) ~= nil})
 end
-sa.MouseButton1Click:Connect(function()
-local inv = getInventory(); local q = string.lower(oSearch3.Text)
-local us = {}; for u in pairs(inv) do table.insert(us, u) end
-local allSel = true
-for _, uuid in ipairs(us) do
-if not table.find(cfg.targets, uuid) then allSel = false; break end
 end
-if allSel then cfg.targets = {} else
-for _, uuid in ipairs(us) do
-local pet = inv[uuid]
-if pet and (q == "" or string.lower(pet.PetType or ""):find(q,1,true)) then
-if not table.find(cfg.targets, uuid) then table.insert(cfg.targets, uuid) end
-end end
+return rows
+end,
+onToggle = function(r)
+local i = table.find(cfg.targets, r.id)
+if i then table.remove(cfg.targets, i) else table.insert(cfg.targets, r.id) end
+saveConfig(); setTgtCount()
+end,
+selectAll = function(shown)
+local allSel = #shown > 0
+for _, r in ipairs(shown) do if not table.find(cfg.targets, r.id) then allSel = false; break end end
+for _, r in ipairs(shown) do
+local i = table.find(cfg.targets, r.id)
+if allSel then if i then table.remove(cfg.targets, i) end
+elseif not i then table.insert(cfg.targets, r.id) end
 end
-saveConfig(); setTgtCount(); rebuild()
-end)
-oSearch3:GetPropertyChangedSignal("Text"):Connect(rebuild)
-tgtOpen = function() ov.Visible = true; rebuild() end
+saveConfig(); setTgtCount()
+end,
+refresh = setTgtCount,
+})
 setTgtCount()
 end
 local logScroll, logCount, doneCount, doneLabel
@@ -4203,7 +4180,7 @@ status(string.format("%s done!", petName), T.SUCCESS)
 pcall(function() sendPetFinishedWebhook(petName, getBase(uuid), os.clock() - startTime, 0, doneCount, totalPets) end)
 local idx2 = table.find(cfg.targets, uuid)
 if idx2 then table.remove(cfg.targets, idx2) end
-if tgtCountLabel then setTgtCount() end
+if tgtSession then setTgtCount() end
 else
 log(string.format(" P2: %s lvl 100", petName), T.ACCENT)
 status(string.format("P2 Lv%d/100 | %s", getAge(uuid), petName), T.ACCENT)
@@ -4230,7 +4207,7 @@ pcall(function() sendPetFinishedWebhook(petName, getBase(uuid), os.clock() - sta
 status(string.format("%s done!", petName), T.SUCCESS)
 local idx2 = table.find(cfg.targets, uuid)
 if idx2 then table.remove(cfg.targets, idx2) end
-if tgtCountLabel then setTgtCount() end
+if tgtSession then setTgtCount() end
 break
 end
 end
@@ -4282,62 +4259,39 @@ spDropdown(mutSec, 2, "Method", "Mutation method", false, methods, {cfg.autoMuta
 cfg.autoMutation.method = v[1] or "Level"; saveConfig()
 end)
 end
-local mutPetBtn
+local mutPetSession
 local function updateMutPetBtn()
 local uuid = cfg.autoMutation.targetUUID
 local p = uuid and getInventory()[uuid]
-mutPetBtn:Set("Target Pet", (p and ((p.PetType or "?"):sub(1,15) .. "...")) or "Select >")
+mutPetSession.setValue(p and ((p.PetType or "?"):sub(1,15)) or "", p ~= nil)
 end
 do
-local mutPetOpen
-mutPetBtn = spButton(mutSec, 3, "Target Pet", "Select >", "", function() if mutPetOpen then mutPetOpen() end end)
-local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-ov.Visible = false; ov.ZIndex = 25
-local bar2 = UI:frame(ov, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(bar2, T.STROKE, 1)
-UI:label(bar2, "Select Pet to Mutate", UDim2.new(1,-30,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local xBtn = UI:button(bar2, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(xBtn, T.ERROR, 1)
-local search = UI:input(ov, "", "Search pet..", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
-search.TextColor3 = T.TEXT; search.Font = Enum.Font.Gotham
-local sf = UI:scroll(ov, UDim2.new(1,0,1,-60), UDim2.new(0,0,0,58))
-UI:list(sf, 3); UI:pad(sf, 3,4,4,3)
-local function rebuildPetList()
-for _, c in ipairs(sf:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local q = string.lower(search.Text)
-local inv = getInventory()
-local uuids = {}
+mutPetSession = spSelectRow(mutSec, 3, "Target Pet", {
+placeholder = "Search pet...",
+closeOnPick = true,
+getRows = function()
+local inv = getInventory(); local uuids = {}
 for u in pairs(inv) do table.insert(uuids, u) end
 table.sort(uuids, function(a,b) return getAge(a) < getAge(b) end)
-local n = 0
+local rows = {}
 for _, uuid in ipairs(uuids) do
 local pet = inv[uuid]
-if not pet then continue end
+if pet then
 local name = pet.PetType or "?"
-if q ~= "" and not string.lower(name):find(q,1,true) then continue end
-local isSel = cfg.autoMutation.targetUUID == uuid
 local level = (pet.PetData and (pet.PetData.Level or 0)) or 0
-local kg = getKG(uuid)
-local txt = string.format("%s | Age %d | %.2f KG", name, level, kg)
-local b = UI:button(sf, txt, UDim2.new(1,0,0,26), nil,
-isSel and T.SEL_BG or Color3.fromRGB(13,13,13), isSel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,2,0); UI:corner(b,5); UI:stroke(b, isSel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-cfg.autoMutation.targetUUID = uuid; saveConfig()
+table.insert(rows, {id = uuid, text = name,
+sub = string.format("Age %d | %.2f KG", level, getKG(uuid)),
+search = name, selected = cfg.autoMutation.targetUUID == uuid})
+end
+end
+return rows
+end,
+onToggle = function(r)
+cfg.autoMutation.targetUUID = r.id; saveConfig(); updateMutPetBtn()
+end,
+refresh = updateMutPetBtn,
+})
 updateMutPetBtn()
-ov.Visible = false
-end)
-n = n + 1
-end
-end
-xBtn.MouseButton1Click:Connect(function() ov.Visible = false end)
-search:GetPropertyChangedSignal("Text"):Connect(rebuildPetList)
-mutPetOpen = function()
-ov.Visible = true
-updateMutPetBtn()
-rebuildPetList()
-end
 end
 do
 local taInp
@@ -4460,95 +4414,62 @@ local giftInner = giftSec:GetContainer()
 spToggle(giftSec, 1, "Enable Auto Gift", "", cfg.toggles.autoGift, function(val)
 cfg.toggles.autoGift = val; saveConfig(); VeliumNotify("Auto Gift", val)
 end)
-local friendBtn
+local friendSession
 local function updateFriendBtn()
 local n = cfg.autoGift.friendName
-friendBtn:Set("Friend", (n and n ~= "" and ("@" .. n)) or "Select Player")
+friendSession.setValue((n and n ~= "" and ("@" .. n)) or "", n ~= nil and n ~= "")
 end
 do
-local friendOpen
-friendBtn = spButton(giftSec, 2, "Friend", "Select Player", "", function() if friendOpen then friendOpen() end end)
-local friendOv = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-friendOv.Visible = false; friendOv.ZIndex = 25
-local friendBar = UI:frame(friendOv, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(friendBar, T.STROKE, 1)
-UI:label(friendBar, "Select Player", UDim2.new(1,-30,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local friendX = UI:button(friendBar, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(friendX, T.ERROR, 1)
-friendX.MouseButton1Click:Connect(function() friendOv.Visible = false end)
-local friendSF = UI:scroll(friendOv, UDim2.new(1,0,1,-36), UDim2.new(0,0,0,32))
-UI:list(friendSF, 3); UI:pad(friendSF, 3,4,4,3)
-local function rebuildFriendList()
-for _, c in ipairs(friendSF:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local n = 0
+friendSession = spSelectRow(giftSec, 2, "Friend", {
+placeholder = "Search player...",
+closeOnPick = true,
+getRows = function()
+local rows = {}
 for _, plr in ipairs(Players:GetPlayers()) do
 if plr ~= LocalPlayer then
-n = n + 1
-local isSel = cfg.autoGift.friendName == plr.Name
-local txt = string.format("@%s (%s)", plr.Name, plr.DisplayName)
-local b = UI:button(friendSF, txt, UDim2.new(1,0,0,26), nil,
-isSel and T.SEL_BG or Color3.fromRGB(13,13,13), isSel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,2,0); UI:corner(b,5); UI:stroke(b, isSel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-cfg.autoGift.friendName = plr.Name; saveConfig()
+table.insert(rows, {id = plr.Name, text = plr.Name, sub = plr.DisplayName,
+search = plr.Name .. " " .. plr.DisplayName, selected = cfg.autoGift.friendName == plr.Name})
+end
+end
+return rows
+end,
+onToggle = function(r)
+cfg.autoGift.friendName = r.id; saveConfig(); updateFriendBtn()
+end,
+refresh = updateFriendBtn,
+})
 updateFriendBtn()
-friendOv.Visible = false
-end)
 end
-end
-end
-friendOpen = function()
-friendOv.Visible = true
-rebuildFriendList()
-end
-end
-local giftPetsBtn
+local giftPetsSession
 local function updateGiftPetsBtn()
 local c = 0; for _ in pairs(cfg.autoGift.petTypes or {}) do c = c + 1 end
-giftPetsBtn:Set("Pets to Gift", c == 0 and "None" or (c .. " selected"))
-giftPetsBtn.Content.TextColor3 = c == 0 and T.DIM or T.ACCENT
+giftPetsSession.setValue(c == 0 and "" or (c .. " selected"), c > 0)
 end
 do
-local giftOpen
-giftPetsBtn = spButton(giftSec, 3, "Pets to Gift", "None", "", function() if giftOpen then giftOpen() end end)
-local ov = UI:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-ov.Visible = false; ov.ZIndex = 25
-local bar3 = UI:frame(ov, UDim2.new(1,0,0,30), nil, T.PANEL)
-UI:stroke(bar3, T.STROKE, 1)
-UI:label(bar3, "Select Pets to Gift", UDim2.new(1,-30,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local xBtn = UI:button(bar3, "X", UDim2.new(0,24,0,22), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-UI:stroke(xBtn, T.ERROR, 1)
-xBtn.MouseButton1Click:Connect(function()
-ov.Visible = false
-updateGiftPetsBtn()
-end)
-local search = UI:input(ov, "", "Search pet..", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,34))
-search.TextColor3 = T.TEXT; search.Font = Enum.Font.Gotham
-local sf = UI:scroll(ov, UDim2.new(1,0,1,-60), UDim2.new(0,0,0,58))
-UI:list(sf, 3); UI:pad(sf, 3,4,4,3)
-local function rebuildGiftList()
-for _, c in ipairs(sf:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
-local q = string.lower(search.Text)
-local n = 0
+local function giftPets() if not cfg.autoGift.petTypes then cfg.autoGift.petTypes = {} end return cfg.autoGift.petTypes end
+giftPetsSession = spSelectRow(giftSec, 3, "Pets to Gift", {
+placeholder = "Search pet...",
+getRows = function()
+local pets = giftPets(); local rows = {}
 for _, pet in ipairs(PetJSON) do
-if q ~= "" and not string.lower(pet.name):find(q,1,true) then continue end
-n = n + 1
-local sel = cfg.autoGift.petTypes and cfg.autoGift.petTypes[pet.name] == true
-local b = UI:button(sf, pet.name, UDim2.new(1,0,0,26), nil,
-sel and T.SEL_BG or Color3.fromRGB(13,13,13), sel and T.SEL_TXT or T.TEXT, 9)
-b.LayoutOrder = n; b.TextXAlignment = Enum.TextXAlignment.Left
-UI:pad(b,0,8,2,0); UI:corner(b,5); UI:stroke(b, sel and T.ACCENT or T.STROKE, 1)
-b.MouseButton1Click:Connect(function()
-if not cfg.autoGift.petTypes then cfg.autoGift.petTypes = {} end
-if cfg.autoGift.petTypes[pet.name] then cfg.autoGift.petTypes[pet.name] = nil
-else cfg.autoGift.petTypes[pet.name] = true end
-saveConfig()
-end)
+table.insert(rows, {id = pet.name, text = pet.name, sub = pet.egg or "", search = pet.name, selected = pets[pet.name] == true})
 end
-end
-search:GetPropertyChangedSignal("Text"):Connect(rebuildGiftList)
-giftOpen = function() ov.Visible = true; rebuildGiftList() end
+return rows
+end,
+onToggle = function(r)
+local pets = giftPets()
+if pets[r.id] then pets[r.id] = nil else pets[r.id] = true end
+saveConfig(); updateGiftPetsBtn()
+end,
+selectAll = function(shown)
+local pets = giftPets(); local allSel = #shown > 0
+for _, r in ipairs(shown) do if not pets[r.id] then allSel = false; break end end
+for _, r in ipairs(shown) do pets[r.id] = allSel and nil or true end
+saveConfig(); updateGiftPetsBtn()
+end,
+refresh = updateGiftPetsBtn,
+})
+updateGiftPetsBtn()
 end
 do
 local wmBtn

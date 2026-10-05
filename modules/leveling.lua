@@ -4,8 +4,22 @@ if not S then return warn("AutoLeveling: HH_Shared not found!") end
 if not S.outerScroll then return warn("AutoLeveling: outerScroll not provided!") end
 if not S.modalRoot then return warn("AutoLeveling: modalRoot not provided!") end
 
-local V               = S.V
-local T               = S.T
+-- Velium: readability pass. External modules used to render at TextSize 8-9 with
+-- a muted gray, which read as "invisible" on the dark Speed window. Clamp every
+-- label/button font up to a legible minimum and brighten the dim gray locally
+-- (proxies only -- the shared theme table itself is left untouched).
+local _V = S.V
+local _labelFn, _buttonFn, _inputFn = _V.label, _V.button, _V.input
+local V = setmetatable({}, { __index = function(_, k)
+ if k == "label" then return function(_, parent, text, size, pos, col, fs, xa)
+  return _labelFn(_V, parent, text, size, pos, col, math.max(fs or 12, 11), xa) end end
+ if k == "button" then return function(_, parent, text, size, pos, bg, tc, fs)
+  return _buttonFn(_V, parent, text, size, pos, bg, tc, math.max(fs or 12, 11)) end end
+ if k == "input" then return function(_, parent, default, ph, size, pos)
+  return _inputFn(_V, parent, default, ph, size, pos) end end
+ return _V[k]
+end })
+local T = setmetatable({ DIM = Color3.fromRGB(196, 194, 190) }, { __index = S.T })
 local D               = S.D
 local CFG             = S.CFG
 local saveD           = S.saveD
@@ -80,20 +94,20 @@ lvTgtLbl.Font = Enum.Font.Gotham
 local lvOpenTgtBtn = V:button(lvTgtRow, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
 V:stroke(lvOpenTgtBtn, T.STROKE, 1)
 
-local lvLogPanel = V:frame(lvScroll, UDim2.new(1,0,0,52), nil, T.PANEL); lvLogPanel.LayoutOrder = 11
+local lvLogPanel = V:frame(lvScroll, UDim2.new(1,0,0,74), nil, T.PANEL); lvLogPanel.LayoutOrder = 11
 V:stroke(lvLogPanel, T.STROKE, 1)
-local lvLogHdr = V:frame(lvLogPanel, UDim2.new(1,0,0,14), nil, T.BG, 1)
-V:label(lvLogHdr, "LOGS", UDim2.new(1,-60,1,0), UDim2.new(0,6,0,0), T.ACCENT, 8).Font = Enum.Font.GothamBold
-local lvDoneLbl = V:label(lvLogHdr, "Done: 0", UDim2.new(0,54,1,0), UDim2.new(1,-58,0,0), T.DIM, 8, Enum.TextXAlignment.Right)
+local lvLogHdr = V:frame(lvLogPanel, UDim2.new(1,0,0,18), nil, T.BG, 1)
+V:label(lvLogHdr, "LOGS", UDim2.new(1,-70,1,0), UDim2.new(0,6,0,0), T.ACCENT, 11).Font = Enum.Font.GothamBold
+local lvDoneLbl = V:label(lvLogHdr, "Done: 0", UDim2.new(0,66,1,0), UDim2.new(1,-70,0,0), T.DIM, 11, Enum.TextXAlignment.Right)
 lvDoneLbl.Font = Enum.Font.Gotham
-local lvLogScroll = V:scroll(lvLogPanel, UDim2.new(1,-4,1,-16), UDim2.new(0,2,0,15))
+local lvLogScroll = V:scroll(lvLogPanel, UDim2.new(1,-4,1,-20), UDim2.new(0,2,0,19))
 V:list(lvLogScroll, 1); V:pad(lvLogScroll, 1, 4, 4, 1)
 local lvLogCount = 0
 local function lvAddLog(msg, col)
  lvLogCount = lvLogCount + 1
- local row = Instance.new("TextLabel"); row.Size = UDim2.new(1,0,0,12)
+ local row = Instance.new("TextLabel"); row.Size = UDim2.new(1,0,0,15)
  row.BackgroundTransparency = 1; row.Text = os.date("%H:%M:%S").."  "..msg
- row.TextColor3 = col or T.DIM; row.Font = Enum.Font.Gotham; row.TextSize = 8
+ row.TextColor3 = col or T.DIM; row.Font = Enum.Font.Gotham; row.TextSize = 11
  row.TextXAlignment = Enum.TextXAlignment.Left; row.TextTruncate = Enum.TextTruncate.AtEnd
  row.LayoutOrder = lvLogCount; row.Parent = lvLogScroll
  local kids = {}; for _,c in ipairs(lvLogScroll:GetChildren()) do if c:IsA("TextLabel") then table.insert(kids,c) end end

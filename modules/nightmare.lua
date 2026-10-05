@@ -4,8 +4,19 @@ if not S then return warn("AutoNightmare: HH_Shared not found!") end
 if not S.outerScroll then return warn("AutoNightmare: outerScroll not provided!") end
 if not S.modalRoot then return warn("AutoNightmare: modalRoot not provided!") end
 
-local V             = S.V
-local T             = S.T
+-- Velium: readability pass (see leveling.lua) -- clamp fonts up + brighten dim gray.
+local _V = S.V
+local _labelFn, _buttonFn, _inputFn = _V.label, _V.button, _V.input
+local V = setmetatable({}, { __index = function(_, k)
+ if k == "label" then return function(_, parent, text, size, pos, col, fs, xa)
+  return _labelFn(_V, parent, text, size, pos, col, math.max(fs or 12, 11), xa) end end
+ if k == "button" then return function(_, parent, text, size, pos, bg, tc, fs)
+  return _buttonFn(_V, parent, text, size, pos, bg, tc, math.max(fs or 12, 11)) end end
+ if k == "input" then return function(_, parent, default, ph, size, pos)
+  return _inputFn(_V, parent, default, ph, size, pos) end end
+ return _V[k]
+end })
+local T             = setmetatable({ DIM = Color3.fromRGB(196, 194, 190) }, { __index = S.T })
 local D             = S.D
 local CFG             = S.CFG
 local saveD           = S.saveD
@@ -185,18 +196,18 @@ nmTgtLbl.Font = Enum.Font.Gotham
 local nmOpenTgtBtn = V:button(nmTgtRow, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
 V:stroke(nmOpenTgtBtn, T.STROKE, 1)
 
-local nmLogPanel = V:frame(nmInner, UDim2.new(1,0,0,52), nil, T.PANEL); nmLogPanel.LayoutOrder = 9
+local nmLogPanel = V:frame(nmInner, UDim2.new(1,0,0,74), nil, T.PANEL); nmLogPanel.LayoutOrder = 9
 V:stroke(nmLogPanel, T.STROKE, 1)
-local nmLogHdr = V:frame(nmLogPanel, UDim2.new(1,0,0,14), nil, T.BG, 1)
-V:label(nmLogHdr, "LOGS", UDim2.new(1,-60,1,0), UDim2.new(0,6,0,0), T.ACCENT, 8).Font = Enum.Font.GothamBold
-local nmLogScroll = V:scroll(nmLogPanel, UDim2.new(1,-4,1,-16), UDim2.new(0,2,0,15))
+local nmLogHdr = V:frame(nmLogPanel, UDim2.new(1,0,0,18), nil, T.BG, 1)
+V:label(nmLogHdr, "LOGS", UDim2.new(1,-60,1,0), UDim2.new(0,6,0,0), T.ACCENT, 11).Font = Enum.Font.GothamBold
+local nmLogScroll = V:scroll(nmLogPanel, UDim2.new(1,-4,1,-20), UDim2.new(0,2,0,19))
 V:list(nmLogScroll, 1); V:pad(nmLogScroll, 1, 4, 4, 1)
 local nmLogCount = 0
 local function nmLog(msg, col)
  nmLogCount = nmLogCount + 1
- local row = Instance.new("TextLabel"); row.Size = UDim2.new(1,0,0,12)
+ local row = Instance.new("TextLabel"); row.Size = UDim2.new(1,0,0,15)
  row.BackgroundTransparency = 1; row.Text = os.date("%H:%M:%S").."  "..msg
- row.TextColor3 = col or T.DIM; row.Font = Enum.Font.Gotham; row.TextSize = 8
+ row.TextColor3 = col or T.DIM; row.Font = Enum.Font.Gotham; row.TextSize = 11
  row.TextXAlignment = Enum.TextXAlignment.Left; row.TextTruncate = Enum.TextTruncate.AtEnd
  row.LayoutOrder = nmLogCount; row.Parent = nmLogScroll
  local kids = {}; for _,c in ipairs(nmLogScroll:GetChildren()) do if c:IsA("TextLabel") then table.insert(kids,c) end end
