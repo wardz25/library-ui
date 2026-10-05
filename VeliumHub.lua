@@ -1338,7 +1338,7 @@ if not vp or vp.X <= 0 or vp.Y <= 0 then return 620, 400 end
 if isMobile then
 return math.clamp(math.floor(vp.X * 0.92), 360, 900), math.clamp(math.floor(vp.Y * 0.74), 300, 760)
 end
-return math.clamp(math.floor(vp.X * 0.47), 600, 900), math.clamp(math.floor(vp.Y * 0.50), 380, 640)
+return math.clamp(math.floor(vp.X * 0.47), 600, 900), math.clamp(math.floor(vp.Y * 0.55), 380, 660)
 end
 local autoW, autoH = computeAutoSize(viewport)
 local savedOK = type(cfg.uiW) == "number" and type(cfg.uiH) == "number" and cfg.uiW >= 560 and cfg.uiH >= 340

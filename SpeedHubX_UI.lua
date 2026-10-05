@@ -493,6 +493,13 @@ function Speed_Library:CreateWindow(Config)
     Thickness = 1.6
   }, Main)
 
+  -- Velium: keep the drop-shadow shell matched to the window at all times
+  -- (window is resizable via the grip handles in VeliumHub).
+  Main:GetPropertyChangedSignal("Size"):Connect(function()
+    DropShadowHolder.Size = Main.Size
+    DropShadow.Size = Main.Size
+  end)
+
   local Top = Custom:Create("Frame", {
     BackgroundColor3 = Color3.fromRGB(0, 0, 0),
     BackgroundTransparency = 0.9990000128746033,
