@@ -338,7 +338,7 @@ function Speed_Library:SetNotification(Config)
     Parent = NotificationFrameReal
   })
 
-  TextLabel2.Size = UDim2.new(1, -20, 0, 13 + (13 * (TextLabel2.TextBounds.X // TextLabel2.AbsoluteSize.X)))
+  TextLabel2.Size = UDim2.new(1, -20, 0, 13 + (13 * (TextLabel2.TextBounds.X // math.max(1, TextLabel2.AbsoluteSize.X))))
   TextLabel2.TextWrapped = true
 
   if TextLabel2.AbsoluteSize.Y < 27 then
@@ -438,6 +438,8 @@ function Speed_Library:CreateWindow(Config)
     Name = "Top"
   }, Main)
 
+  -- Velium: named so the title-bar layout code can find them reliably
+  -- (the old UIStroke-based identification broke once the stroke was removed).
   local TextLabel = Custom:Create("TextLabel", {
     Font = Enum.Font.GothamBold,
     Text = Title,
@@ -449,7 +451,8 @@ function Speed_Library:CreateWindow(Config)
     BorderColor3 = Color3.fromRGB(0, 0, 0),
     BorderSizePixel = 0,
     Size = UDim2.new(1, -100, 1, 0),
-    Position = UDim2.new(0, 10, 0, 0)
+    Position = UDim2.new(0, 10, 0, 0),
+    Name = "WindowTitle"
   }, Top)
 
   Custom:Create("UICorner", {}, Top)
@@ -464,8 +467,9 @@ function Speed_Library:CreateWindow(Config)
     BackgroundTransparency = 0.9990000128746033,
     BorderColor3 = Color3.fromRGB(0, 0, 0),
     BorderSizePixel = 0,
-    Size = UDim2.new(1, -(TextLabel.TextBounds.X + 104), 1, 0),
-    Position = UDim2.new(0, TextLabel.TextBounds.X + 15, 0, 0)
+    Size = UDim2.new(1, -120, 1, 0),
+    Position = UDim2.new(0, 10, 0, 0),
+    Name = "WindowDesc"
   }, Top)
 
   -- (sub-pixel UIStroke removed: it made the game-name label look fuzzy)
@@ -630,7 +634,11 @@ function Speed_Library:CreateWindow(Config)
 		if not Speed_Library.Unloaded then Speed_Library.Unloaded = true end
 	end)
 
-  DropShadowHolder.Size = UDim2.new(0, 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 350)
+  -- Velium: TextBounds is 0 synchronously at creation, so defer the fit.
+  task.defer(function()
+    local w = 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X
+    DropShadowHolder.Size = UDim2.new(0, w, 0, 350)
+  end)
 	MakeDraggable(Top, DropShadowHolder)
 
 
@@ -759,6 +767,9 @@ function Speed_Library:CreateWindow(Config)
   local Tabs = {}
   local CountTab = 0
   local CountDropdown = 0
+  -- Velium: sections are created while their tab is hidden, so their content
+  -- size reads as 0. Re-measure a tab's sections when it becomes visible.
+  local SectionUpdaters = {}
   function Tabs:CreateTab(Config)
     local _Name = Config[1] or Config.Name or "" 
     local Icon = Config[2] or Config.Icon or ""
@@ -905,6 +916,14 @@ function Speed_Library:CreateWindow(Config)
         _FTween:Play()
   
         LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
+
+        -- Velium: re-measure this tab's sections now that it is visible.
+        local _secUpdaters = SectionUpdaters[ScrolLayers]
+        if _secUpdaters then
+          task.defer(function()
+            for _, fn in ipairs(_secUpdaters) do pcall(fn) end
+          end)
+        end
   
         task.wait(0.05)
         NameTab.Text = _Name
@@ -1068,16 +1087,21 @@ function Speed_Library:CreateWindow(Config)
           -- This is correct even when children use AutomaticSize (offset == 0),
           -- which is what made PET TEAMS look clipped.
           local contentH = SectionAdd.AbsoluteContentSize.Y
+          if contentH ~= contentH or contentH == math.huge or contentH == -math.huge then contentH = 0 end
           if contentH > 0 then
             SectionSizeYWitdh = 38 + contentH + 3
           else
             for _, v in pairs(SectionAdd:GetChildren()) do
               if v.Name ~= "UIListLayout" and v.Name ~= "UICorner" then
                 local _ch = v.AbsoluteSize.Y
-                if _ch <= 0 then _ch = v.Size.Y.Offset end
+                if _ch <= 0 or _ch ~= _ch or _ch == math.huge then _ch = v.Size.Y.Offset end
                 SectionSizeYWitdh = SectionSizeYWitdh + _ch + 3
               end
             end
+          end
+          -- Never tween to a non-finite size (would throw / blank the section).
+          if SectionSizeYWitdh ~= SectionSizeYWitdh or SectionSizeYWitdh == math.huge or SectionSizeYWitdh < 30 then
+            SectionSizeYWitdh = 38
           end
 
           TweenService:Create(FeatureFrame, TweenInfo.new(0.1), {Rotation = 90}):Play()
@@ -1115,6 +1139,19 @@ function Speed_Library:CreateWindow(Config)
       end)
     
       UpdateSizeScroll()
+      -- Velium: sections created already-open never got an initial measure
+      -- (items are added AFTER AddSection returns), so defer one pass.
+      if OpenSection then
+        task.defer(function()
+          pcall(UpdateSizeSection)
+        end)
+      end
+      -- Velium: let the tab-switch handler re-measure this section when shown.
+      SectionUpdaters[ScrolLayers] = SectionUpdaters[ScrolLayers] or {}
+      table.insert(SectionUpdaters[ScrolLayers], function()
+        UpdateSizeSection()
+        UpdateSizeScroll()
+      end)
 
       local Item, ItemCount = {}, 0
       function Item:GetContainer() -- Velium: free-form parenting for external modules
@@ -1169,12 +1206,13 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.999,
           BorderSizePixel = 0,
           Position = UDim2.new(0, 10, 0, 23),
+          Size = UDim2.new(1, -16, 0, 12),
           Name = "ParagraphContent",
         }, Paragraph)
 
         local function UpdateParagraphSize()
           ParagraphContent.TextWrapped = false
-          local lineCount = math.ceil(ParagraphContent.TextBounds.X / ParagraphContent.AbsoluteSize.X)
+          local lineCount = math.ceil(ParagraphContent.TextBounds.X / math.max(1, ParagraphContent.AbsoluteSize.X))
 
           ParagraphContent.Size = UDim2.new(1, -16, 0, 12 + (12 * lineCount))
           Paragraph.Size = UDim2.new(1, 0, 0, ParagraphContent.AbsoluteSize.Y + 33)
@@ -1339,7 +1377,7 @@ function Speed_Library:CreateWindow(Config)
 				}, Button)
 
         local function UpdateButtonSize()
-          local _Height = 12 + (12 * (ButtonContent.TextBounds.X // ButtonContent.AbsoluteSize.X))
+          local _Height = 12 + (12 * (ButtonContent.TextBounds.X // math.max(1, ButtonContent.AbsoluteSize.X)))
           ButtonContent.Size = UDim2.new(1, -100, 0, _Height)
           
           Button.Size = UDim2.new(1, 0, 0, ButtonContent.AbsoluteSize.Y + 33)
@@ -1481,7 +1519,7 @@ function Speed_Library:CreateWindow(Config)
 				
         local function UpdateToggleSize()
           ToggleContent.TextWrapped = false
-          local Ratio = ToggleContent.TextBounds.X / ToggleContent.AbsoluteSize.X
+          local Ratio = ToggleContent.TextBounds.X / math.max(1, ToggleContent.AbsoluteSize.X)
 
           ToggleContent.Size = UDim2.new(1, -100, 0, 12 + (12 * math.ceil(Ratio)))
           Toggle.Size = UDim2.new(1, 0, 0, ToggleContent.AbsoluteSize.Y + 33)
@@ -1632,7 +1670,7 @@ function Speed_Library:CreateWindow(Config)
 
         local function UpdateSliderSize()
           SliderContent.TextWrapped = false
-          SliderContent.Size = UDim2.new(1, -180, 0, 12 + (12 * math.floor(SliderContent.TextBounds.X / SliderContent.AbsoluteSize.X)))
+          SliderContent.Size = UDim2.new(1, -180, 0, 12 + (12 * math.floor(SliderContent.TextBounds.X / math.max(1, SliderContent.AbsoluteSize.X))))
           Slider.Size = UDim2.new(1, 0, 0, SliderContent.AbsoluteSize.Y + 33)
           SliderContent.TextWrapped = true
         end
@@ -1841,7 +1879,7 @@ function Speed_Library:CreateWindow(Config)
         })
 
         local function UpdateInputSize()
-          local Ratio = InputContent.TextBounds.X / InputContent.AbsoluteSize.X
+          local Ratio = InputContent.TextBounds.X / math.max(1, InputContent.AbsoluteSize.X)
           local Calculated = 12 + (12 * math.floor(Ratio))
 
           InputContent.Size = UDim2.new(1, -180, 0, Calculated)
@@ -1982,14 +2020,14 @@ function Speed_Library:CreateWindow(Config)
           Parent = Dropdown
         })
         
-				DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // DropdownContent.AbsoluteSize.X)))
+				DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // math.max(1, DropdownContent.AbsoluteSize.X))))
 				DropdownContent.TextWrapped = true
 				Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
         
         DropdownContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
           DropdownContent.TextWrapped = false
             
-					DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // DropdownContent.AbsoluteSize.X)))
+					DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // math.max(1, DropdownContent.AbsoluteSize.X))))
 					Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
             
           DropdownContent.TextWrapped = true

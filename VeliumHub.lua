@@ -82,7 +82,7 @@ else error("[Velium Hub] Could not load VeliumMainLibrary!") end
 end
 end
 local UI = Library.new()
-local VELIUM_BUILD = "2026-09-16g"
+local VELIUM_BUILD = "2026-09-16h"
 if not Library.buildPetList then
 Library.buildPetList = function(self, parent, selected, favs, onClick, getKG2, getInventory2, isFav2, sortFn2)
 local T2 = self.T
@@ -1414,11 +1414,19 @@ end
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
-local titleLbl0, descLbl0 = nil, nil
+-- Velium: locate by explicit Name (added in SpeedHubX_UI.CreateWindow).
+local titleLbl0 = topF:FindFirstChild("WindowTitle")
+local descLbl0 = topF:FindFirstChild("WindowDesc")
+if not titleLbl0 or not descLbl0 then
+-- Fallback for older UI builds: first two left-aligned labels in order.
+local lbls = {}
 for _, c in ipairs(topF:GetChildren()) do
 if c:IsA("TextLabel") and c.TextXAlignment == Enum.TextXAlignment.Left then
-if c:FindFirstChildOfClass("UIStroke") then descLbl0 = c else titleLbl0 = c end
+table.insert(lbls, c)
 end
+end
+titleLbl0 = titleLbl0 or lbls[1]
+descLbl0 = descLbl0 or lbls[2]
 end
 local logoImg = Instance.new("ImageLabel")
 logoImg.Size = UDim2.new(0, 26, 0, 26)
@@ -1426,20 +1434,28 @@ logoImg.Position = UDim2.new(0, 7, 0.5, -13)
 logoImg.BackgroundTransparency = 1
 logoImg.Image = "rbxassetid://118973578063038"
 logoImg.ScaleType = Enum.ScaleType.Fit
+logoImg.ZIndex = 2
 logoImg.Parent = topF
-task.defer(function()
-pcall(function()
-if titleLbl0 then
 local LOGO_W = 40
-titleLbl0.Position = UDim2.new(0, LOGO_W, 0, 0)
+local function layoutTitleBar()
+if not titleLbl0 then return end
 local tw = titleLbl0.TextBounds.X
+if not tw or tw <= 0 then return end
+titleLbl0.Position = UDim2.new(0, LOGO_W, 0, 0)
 titleLbl0.Size = UDim2.new(0, tw + 4, 1, 0)
 if descLbl0 then
-descLbl0.Position = UDim2.new(0, LOGO_W + tw + 10, 0, 0)
-descLbl0.Size = UDim2.new(1, -(LOGO_W + tw + 10 + 70), 1, 0)
+local dx = LOGO_W + tw + 10
+descLbl0.Position = UDim2.new(0, dx, 0, 0)
+descLbl0.Size = UDim2.new(1, -(dx + 70), 1, 0)
 end
 end
+task.defer(function()
+pcall(layoutTitleBar)
+if titleLbl0 then
+pcall(function()
+titleLbl0:GetPropertyChangedSignal("TextBounds"):Connect(function() pcall(layoutTitleBar) end)
 end)
+end
 end)
 end
 local layersTab = mainFrame:FindFirstChild("LayersTab")
@@ -1670,6 +1686,7 @@ end)
 -- ============================================================
 -- HATCH TAB
 -- ============================================================
+print("[Velium Hub] TAB build: HATCH")
 do
 local hatchSec = tabHatch:AddSection("AUTO HATCH", true)
 local hatchInner = hatchSec:GetContainer()
@@ -2975,6 +2992,7 @@ end
 -- ============================================================
 -- TEAMS TAB
 -- ============================================================
+print("[Velium Hub] TAB build: TEAMS")
 do
 local tmSection = tabTeams:AddSection("PET TEAMS", true)
 local tmScroll = tmSection:GetContainer()
@@ -3339,6 +3357,7 @@ end
 -- ============================================================
 -- MISC TAB
 -- ============================================================
+print("[Velium Hub] TAB build: MISC")
 do
 local visSec = tabMisc:AddSection("VISIBILITY", true)
 local visConnections = {}
@@ -3568,6 +3587,7 @@ print("[Velium Hub] INTERFACE accordion built.")
 -- ============================================================
 -- WEBHOOK TAB
 -- ============================================================
+print("[Velium Hub] TAB build: WEBHOOK")
 do
 local whSec = tabWebhook:AddSection("WEBHOOK", true)
 
@@ -3605,6 +3625,7 @@ end
 -- ============================================================
 -- AUTOMATION TAB (hosts Leveling, Nightmare, Elephant, Mutation, Gift)
 -- ============================================================
+print("[Velium Hub] TAB build: AUTOMATION")
 do
 local levelBox = tabAuto:AddSection("LEVELING", true):GetContainer()
 local nightmareBox = tabAuto:AddSection("NIGHTMARE", false):GetContainer()
@@ -4598,4 +4619,4 @@ end)
 end
 end)
 notifyReady = true
-print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed3.", os.clock() - tStart, VELIUM_BUILD))
+print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed4.", os.clock() - tStart, VELIUM_BUILD))
