@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16j"
+local VELIUM_BUILD = "2026-09-16k"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -1327,10 +1327,15 @@ pcall(function() CoreGui:FindFirstChild("VeliumHubUI"):Destroy() end)
 local viewport = workspace.CurrentCamera.ViewportSize
 local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
 local guiW, guiH = cfg.uiW or 480, cfg.uiH or 340
-local guiScale = 1
+-- Velium: scale the hub to the user's screen so it never looks tiny.
+local function computeGuiScale(vp)
+if not vp or vp.X <= 0 or vp.Y <= 0 then return 1 end
 if isMobile then
-guiScale = math.clamp((viewport.X / 420) * 0.72, 0.65, 1.4)
+return math.clamp((vp.X / 420) * 0.72, 0.65, 1.4)
 end
+return math.clamp(vp.Y / 760, 1.0, 1.6)
+end
+local guiScale = computeGuiScale(viewport)
 local speedSrc = prefetchAwait("speedui")
 if type(speedSrc) ~= "string" then
 speedSrc = game:HttpGet(UI_URL)
@@ -1619,6 +1624,16 @@ local function applyInterfaceScale()
 uiScaleObj.Scale = guiScale * (interfaceScales[cfg.uiScale] or 1)
 end
 applyInterfaceScale()
+-- Velium: re-fit whenever the game window / screen size changes.
+pcall(function()
+local cam = workspace.CurrentCamera
+if cam then
+cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+guiScale = computeGuiScale(cam.ViewportSize)
+applyInterfaceScale()
+end)
+end
+end)
 -- RESIZE GRIPS (BOTTOM EDGE: bottom-left drags left+bottom, bottom-right drags right+bottom)
 local RESIZE_MIN_W, RESIZE_MIN_H = 380, 280
 local function makeGrip(pos)
