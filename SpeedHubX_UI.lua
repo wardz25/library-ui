@@ -60,8 +60,9 @@ local function OpenClose()
     BackgroundTransparency = 0,
     Position = UDim2.new(0.1021, 0, 0.0743, 0),
     Size = UDim2.new(0, 50, 0, 50),
-    Image = "rbxassetid://118973578063038",
-    ScaleType = Enum.ScaleType.Fit,
+    Image = "",
+    ClipsDescendants = true,
+    AutoButtonColor = false,
     Visible = false,
   }, ScreenGui)
 
@@ -74,6 +75,21 @@ local function OpenClose()
     Name = "MinRing",
     Color = Color3.fromRGB(128, 255, 234),
     Thickness = 2,
+  }, Close_ImageButton)
+
+  -- Velium: the logo asset ships with a black SQUARE background, so it is
+  -- drawn in a child label and clipped to the button's circular UICorner.
+  -- Button itself stays a plain black disc + teal ring.
+  Custom:Create("ImageLabel", {
+    Name = "VeliumLogo",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    Size = UDim2.new(1, -8, 1, -8),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    Image = "rbxassetid://118973578063038",
+    ScaleType = Enum.ScaleType.Fit,
+    Active = false,
   }, Close_ImageButton)
 
   local dragging, dragStart, startPos = false, nil, nil
