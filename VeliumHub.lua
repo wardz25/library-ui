@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16r"
+local VELIUM_BUILD = "2026-09-16s"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -3737,7 +3737,11 @@ cfg.webhook.continueSession = val; saveConfig()
 end)
 
 -- Reset Session Data button
-local resetBtn = spButton(whSec, 4, "Reset Session Data", "Clear stored session + cycle data", "🔄", function()
+-- Velium: the local must be declared BEFORE the callback that captures it,
+-- otherwise `resetBtn` inside the closure resolves to a global nil and the
+-- first click throws "attempt to index nil with 'Set'".
+local resetBtn
+resetBtn = spButton(whSec, 4, "Reset Session Data", "Clear stored session + cycle data", "🔄", function()
 cfg.webhook.sessionData = nil
 cfg.webhook.lastCycle = nil
 cfg.webhook.lastPet = nil
@@ -3750,7 +3754,8 @@ end)
 end)
 
 -- Send Test button
-local testBtn = spButton(whSec, 9, "Send Test", "Send a test embed to your webhook", "📡", function()
+local testBtn
+testBtn = spButton(whSec, 9, "Send Test", "Send a test embed to your webhook", "📡", function()
 testBtn:Set("Sending...", "")
 sendTestWebhook()
 task.delay(2, function() testBtn:Set("Send Test", "Send a test embed to your webhook") end)
