@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16o"
+local VELIUM_BUILD = "2026-09-16p"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -1680,6 +1680,45 @@ logoImg.Image = "rbxassetid://118973578063038"
 logoImg.ScaleType = Enum.ScaleType.Fit
 logoImg.ZIndex = 2
 logoImg.Parent = topF
+-- Velium: restyle the title-bar close (X) and minimize (-) into crisp rounded
+-- chips with hover feedback. The vendored Speed buttons were bare text glyphs,
+-- which read as thin/"flat" lines once the interface scale changed.
+local function restyleTopBtn(btn, glyph, danger)
+ if not btn then return end
+ btn.Text = glyph
+ btn.Font = Enum.Font.GothamBold
+ btn.TextSize = 15
+ btn.TextColor3 = T.DIM
+ btn.AutoButtonColor = false
+ btn.BackgroundColor3 = T.BTN
+ btn.BackgroundTransparency = 0.1
+ btn.Size = UDim2.new(0, 26, 0, 26)
+ btn.TextYAlignment = Enum.TextYAlignment.Center
+ btn.TextXAlignment = Enum.TextXAlignment.Center
+ if not btn:FindFirstChildOfClass("UICorner") then UI:corner(btn, 6) end
+ if not btn:FindFirstChildOfClass("UIStroke") then UI:stroke(btn, T.STROKE, 1) end
+ local hot = danger and T.ERROR or T.ACCENT
+ btn.MouseEnter:Connect(function()
+  btn.BackgroundColor3 = hot
+  btn.BackgroundTransparency = 0.78
+  btn.TextColor3 = hot
+ end)
+ btn.MouseLeave:Connect(function()
+  btn.BackgroundColor3 = T.BTN
+  btn.BackgroundTransparency = 0.1
+  btn.TextColor3 = T.DIM
+ end)
+end
+local closeBtn = topF:FindFirstChild("Close")
+if closeBtn then
+ closeBtn.Position = UDim2.new(1, -10, 0.5, 0)
+ restyleTopBtn(closeBtn, "X", true)
+end
+local minBtn = topF:FindFirstChild("Min")
+if minBtn then
+ minBtn.Position = UDim2.new(1, -40, 0.5, 0)
+ restyleTopBtn(minBtn, "\u{2013}", false)
+end
 end
 local layersTab = mainFrame:FindFirstChild("LayersTab")
 local scrollTab = layersTab and layersTab:FindFirstChild("ScrollTab")
