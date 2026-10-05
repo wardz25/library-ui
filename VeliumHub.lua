@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16p"
+local VELIUM_BUILD = "2026-09-16q"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -1364,18 +1364,22 @@ local confirmOv
 local modalRoot = UI:frame(ScreenGui, UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), T.BG, 1)
 modalRoot.Name = "VeliumModal"
 modalRoot.ZIndex = 200
-local TAB_ICONS = {
-	HATCH = "🥚",
-	AUTOMATION = "🤖",
-	TEAMS = "🐾",
-	WEBHOOK = "📡",
-	MISC = "⚙️",
-}
-local tabHatch = speedTabs:CreateTab({"HATCH", TAB_ICONS.HATCH})
-local tabAuto = speedTabs:CreateTab({"AUTOMATION", TAB_ICONS.AUTOMATION})
-local tabTeams = speedTabs:CreateTab({"TEAMS", TAB_ICONS.TEAMS})
-local tabWebhook = speedTabs:CreateTab({"WEBHOOK", TAB_ICONS.WEBHOOK})
-local tabMisc = speedTabs:CreateTab({"MISC", TAB_ICONS.MISC})
+-- Velium: tab icons are white monochrome line icons (Lucide sprite sheets,
+-- cropped with ImageRectOffset/Size). Emoji glyphs ignore TextColor3, so they
+-- can never be tinted white - image icons are used instead.
+local function spTabIcon(id, ox, oy)
+	return {
+		Image = "rbxassetid://" .. id,
+		RectSize = Vector2.new(256, 256),
+		RectOffset = Vector2.new(ox, oy),
+		Color = Color3.fromRGB(255, 255, 255),
+	}
+end
+local tabHatch = speedTabs:CreateTab({"Hatch", spTabIcon(16898669689, 514, 514)})
+local tabAuto = speedTabs:CreateTab({"Automation", spTabIcon(16898733146, 257, 0)})
+local tabTeams = speedTabs:CreateTab({"Teams", spTabIcon(16898731301, 514, 514)})
+local tabWebhook = speedTabs:CreateTab({"Webhook", spTabIcon(16898733534, 514, 514)})
+local tabMisc = speedTabs:CreateTab({"Misc", spTabIcon(16898734421, 514, 0)})
 
 -- ============================================================
 -- Speed-native item helpers (thin wrappers for terse call sites)

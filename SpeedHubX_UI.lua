@@ -928,7 +928,24 @@ function Speed_Library:CreateWindow(Config)
       Name = "TabName",
     }, Tab)
 
-    if Icon ~= "" and not string.find(Icon, "rbxassetid") and not string.find(Icon, "http") then
+    if type(Icon) == "table" then
+      -- Velium: sprite-sheet icon (white monochrome line icon). Emoji glyphs
+      -- ignore TextColor3 and can never be tinted, so white icons are supplied
+      -- as cropped images instead.
+      Custom:Create("ImageLabel", {
+        Image = Icon.Image or "",
+        ImageRectSize = Icon.RectSize,
+        ImageRectOffset = Icon.RectOffset,
+        ImageColor3 = Icon.Color or Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1,
+        BorderColor3 = Color3.fromRGB(0, 0, 0),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 9, 0, 7),
+        Size = UDim2.new(0, 16, 0, 16),
+        Name = "FeatureImg",
+      }, Tab)
+    elseif Icon ~= "" and not string.find(Icon, "rbxassetid") and not string.find(Icon, "http") then
       Custom:Create("TextLabel", {
         Font = Enum.Font.GothamBold,
         Text = Icon,
