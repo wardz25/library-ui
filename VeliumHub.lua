@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16l"
+local VELIUM_BUILD = "2026-09-16m"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -326,6 +326,10 @@ end
 if data.petboost.mode2 then for k, v in pairs(data.petboost.mode2) do cfg.petboost.mode2[k] = v end end
 end
 if data.toggles then for k, v in pairs(data.toggles) do cfg.toggles[k] = v end end
+if data.uiW ~= nil then cfg.uiW = data.uiW end
+if data.uiH ~= nil then cfg.uiH = data.uiH end
+if data.uiManual ~= nil then cfg.uiManual = data.uiManual end
+if data.uiScale ~= nil then cfg.uiScale = data.uiScale end
 if data.misc then for k, v in pairs(data.misc) do cfg.misc[k] = v end end
 if data.webhook then for k, v in pairs(data.webhook) do cfg.webhook[k] = v end end
 if cfg.webhook.continueSession == nil then cfg.webhook.continueSession = false end
@@ -409,8 +413,9 @@ if cfg.autoHatch[k] == nil then cfg.autoHatch[k] = v end
 end
 end
 loadConfig()
-if type(cfg.uiW) ~= "number" or cfg.uiW < 380 or cfg.uiW > 1400 then cfg.uiW = 480 end
-if type(cfg.uiH) ~= "number" or cfg.uiH < 280 or cfg.uiH > 1000 then cfg.uiH = 340 end
+if type(cfg.uiW) ~= "number" or cfg.uiW < 560 or cfg.uiW > 1400 then cfg.uiW = 620 end
+if type(cfg.uiH) ~= "number" or cfg.uiH < 340 or cfg.uiH > 1000 then cfg.uiH = 400 end
+if cfg.uiManual == nil then cfg.uiManual = false end
 if cfg.autoHatch.ahEquipDelay then TIMING.AH_EQUIP_DELAY = cfg.autoHatch.ahEquipDelay end
 if cfg.autoHatch.ahUnequipDelay then TIMING.AH_UNEQUIP_DELAY = cfg.autoHatch.ahUnequipDelay end
 if cfg.autoHatch.postUnequipBuffer then TIMING.AH_POST_UNEQUIP_BUFFER = cfg.autoHatch.postUnequipBuffer end
@@ -1326,22 +1331,33 @@ end)
 pcall(function() CoreGui:FindFirstChild("VeliumHubUI"):Destroy() end)
 local viewport = workspace.CurrentCamera.ViewportSize
 local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
-local guiW, guiH = cfg.uiW or 480, cfg.uiH or 340
--- Velium: scale the hub to the user's screen so it never looks tiny.
-local function computeGuiScale(vp)
-if not vp or vp.X <= 0 or vp.Y <= 0 then return 1 end
+-- Velium: adapt the WINDOW SIZE to the user's screen (wide layout) instead of
+-- scaling the whole UI with a UIScale (which looked zoomed / cramped).
+local function computeAutoSize(vp)
+if not vp or vp.X <= 0 or vp.Y <= 0 then return 620, 400 end
 if isMobile then
-return math.clamp((vp.X / 420) * 0.72, 0.65, 1.4)
+return math.clamp(math.floor(vp.X * 0.92), 360, 900), math.clamp(math.floor(vp.Y * 0.74), 300, 760)
 end
-return math.clamp(vp.Y / 760, 1.0, 1.6)
+return math.clamp(math.floor(vp.X * 0.47), 600, 900), math.clamp(math.floor(vp.Y * 0.50), 380, 640)
 end
-local guiScale = computeGuiScale(viewport)
+local autoW, autoH = computeAutoSize(viewport)
+local savedOK = type(cfg.uiW) == "number" and type(cfg.uiH) == "number" and cfg.uiW >= 560 and cfg.uiH >= 340
+local guiW, guiH
+if cfg.uiManual and savedOK then
+guiW, guiH = cfg.uiW, cfg.uiH
+else
+guiW, guiH = autoW, autoH
+end
+local guiScale = 1
+if isMobile then
+guiScale = math.clamp((viewport.X / 420) * 0.72, 0.65, 1.4)
+end
 local speedSrc = prefetchAwait("speedui")
 if type(speedSrc) ~= "string" then
 speedSrc = game:HttpGet(UI_URL)
 end
 local SpeedLib = loadstring(speedSrc)()
-local speedTabs = SpeedLib:CreateWindow({"Velium Hub", "| Grow A Garden", 145, UDim2.fromOffset(guiW, guiH)})
+local speedTabs = SpeedLib:CreateWindow({"Velium Hub", "| Grow A Garden", 200, UDim2.fromOffset(guiW, guiH)})
 local ScreenGui = speedTabs._Gui
 local mainFrame = speedTabs._Main
 local confirmOv
@@ -1476,69 +1492,37 @@ end
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
--- Velium: locate by explicit Name (added in SpeedHubX_UI.CreateWindow).
-local titleLbl0 = topF:FindFirstChild("WindowTitle")
-local descLbl0 = topF:FindFirstChild("WindowDesc")
-if not titleLbl0 or not descLbl0 then
--- Fallback for older UI builds: first two left-aligned labels in order.
-local lbls = {}
-for _, c in ipairs(topF:GetChildren()) do
-if c:IsA("TextLabel") and c.TextXAlignment == Enum.TextXAlignment.Left then
-table.insert(lbls, c)
-end
-end
-titleLbl0 = titleLbl0 or lbls[1]
-descLbl0 = descLbl0 or lbls[2]
-end
+-- Velium: the title row ("Velium Hub" + "| Grow A Garden") is laid out by a
+-- horizontal UIListLayout inside SpeedHubX_UI.CreateWindow, so spacing is
+-- fixed and snug. Here we only need to place the logo to its left.
 local logoImg = Instance.new("ImageLabel")
-logoImg.Size = UDim2.new(0, 26, 0, 26)
-logoImg.Position = UDim2.new(0, 7, 0.5, -13)
+logoImg.Size = UDim2.new(0, 24, 0, 24)
+logoImg.Position = UDim2.new(0, 7, 0.5, -12)
 logoImg.BackgroundTransparency = 1
 logoImg.Image = "rbxassetid://118973578063038"
 logoImg.ScaleType = Enum.ScaleType.Fit
 logoImg.ZIndex = 2
 logoImg.Parent = topF
-local LOGO_W = 40
-local function layoutTitleBar()
-if not titleLbl0 then return end
-local tw = titleLbl0.TextBounds.X
-if not tw or tw <= 0 then return end
-titleLbl0.Position = UDim2.new(0, LOGO_W, 0, 0)
-titleLbl0.Size = UDim2.new(0, tw + 4, 1, 0)
-if descLbl0 then
-local dx = LOGO_W + tw + 10
-descLbl0.Position = UDim2.new(0, dx, 0, 0)
-descLbl0.Size = UDim2.new(1, -(dx + 70), 1, 0)
-end
-end
-task.defer(function()
-pcall(layoutTitleBar)
-if titleLbl0 then
-pcall(function()
-titleLbl0:GetPropertyChangedSignal("TextBounds"):Connect(function() pcall(layoutTitleBar) end)
-end)
-end
-end)
 end
 local layersTab = mainFrame:FindFirstChild("LayersTab")
 local scrollTab = layersTab and layersTab:FindFirstChild("ScrollTab")
 if layersTab and scrollTab then
 scrollTab.Size = UDim2.new(1, 0, 1, -66)
-local prof = UI:frame(layersTab, UDim2.new(1, -8, 0, 48), UDim2.new(0, 4, 1, -52), T.PANEL)
+local prof = UI:frame(layersTab, UDim2.new(1, -8, 0, 52), UDim2.new(0, 4, 1, -56), T.PANEL)
 UI:corner(prof, 8); UI:stroke(prof, T.STROKE, 1)
 local av = Instance.new("ImageLabel", prof)
-av.Size = UDim2.new(0, 30, 0, 30)
-av.Position = UDim2.new(0, 6, 0.5, -15)
+av.Size = UDim2.new(0, 36, 0, 36)
+av.Position = UDim2.new(0, 7, 0.5, -18)
 av.BackgroundTransparency = 1
 av.Image = "rbxassetid://118973578063038"
 av.ScaleType = Enum.ScaleType.Fit
 av.ClipsDescendants = true
-UI:corner(av, 15)
+UI:corner(av, 18)
 pcall(function()
 local thumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
 if thumb and thumb ~= "" then av.Image = thumb end
 end)
-local nm = UI:label(prof, LocalPlayer.Name, UDim2.new(1, -44, 1, 0), UDim2.new(0, 40, 0, 0), T.TEXT, 10)
+local nm = UI:label(prof, LocalPlayer.Name, UDim2.new(1, -52, 1, 0), UDim2.new(0, 49, 0, 0), T.TEXT, 12)
 nm.Font = Enum.Font.GothamBold
 nm.TextTruncate = Enum.TextTruncate.AtEnd
 end
@@ -1625,18 +1609,26 @@ local function applyInterfaceScale()
 uiScaleObj.Scale = guiScale * (interfaceScales[cfg.uiScale] or 1)
 end
 applyInterfaceScale()
--- Velium: re-fit whenever the game window / screen size changes.
+-- Velium: re-fit the window size whenever the game window / screen size changes
+-- (only when the user has not manually resized + saved a size).
 pcall(function()
 local cam = workspace.CurrentCamera
 if cam then
 cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-guiScale = computeGuiScale(cam.ViewportSize)
+local vp = cam.ViewportSize
+local nw, nh = computeAutoSize(vp)
+if not cfg.uiManual then
+mainFrame.Size = UDim2.new(0, nw, 0, nh)
+end
+if isMobile then
+guiScale = math.clamp((vp.X / 420) * 0.72, 0.65, 1.4)
 applyInterfaceScale()
+end
 end)
 end
 end)
 -- RESIZE GRIPS (BOTTOM EDGE: bottom-left drags left+bottom, bottom-right drags right+bottom)
-local RESIZE_MIN_W, RESIZE_MIN_H = 380, 280
+local RESIZE_MIN_W, RESIZE_MIN_H = 560, 340
 local function makeGrip(pos)
 local b = UI:button(mainFrame, "", UDim2.new(0, 22, 0, 22), pos, T.BTN, T.TEXT, 10)
 b.BackgroundTransparency = 0.75
@@ -1684,7 +1676,7 @@ input.Changed:Connect(function()
 if input.UserInputState == Enum.UserInputState.End and input == dragInput then
 activeHandle = nil
 dragInput = nil
-if cfg then cfg.uiW = mainFrame.Size.X.Offset; cfg.uiH = mainFrame.Size.Y.Offset; saveConfig() end
+if cfg then cfg.uiW = mainFrame.Size.X.Offset; cfg.uiH = mainFrame.Size.Y.Offset; cfg.uiManual = true; saveConfig() end
 print("[Velium Hub] Resize end, size saved: " .. tostring(mainFrame.Size.X.Offset) .. "x" .. tostring(mainFrame.Size.Y.Offset))
 end
 end)

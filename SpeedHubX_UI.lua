@@ -451,10 +451,13 @@ function Speed_Library:CreateWindow(Config)
   local DropShadowHolder = Custom:Create("Frame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    Size = UDim2.new(0, 455, 0, 350),
+    Size = SizeUi,
     ZIndex = 0,
     Name = "DropShadowHolder",
-    Position = UDim2.new(0, (SpeedHubXGui.AbsoluteSize.X // 2 - 455 // 2), 0, (SpeedHubXGui.AbsoluteSize.Y // 2 - 350 // 2))
+    -- Velium: anchor-centered so it stays centered for ANY window size
+    -- (the old fixed 455x350 offset math broke once the window got wider).
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.5, 0)
   }, SpeedHubXGui)
 
   local DropShadow = Custom:Create("ImageLabel", {
@@ -499,6 +502,26 @@ function Speed_Library:CreateWindow(Config)
     Name = "Top"
   }, Main)
 
+  -- Velium: title + "| game name" live in a horizontal UIListLayout row, so the
+  -- gap between them is always a fixed 5px. (The old pixel math on TextBounds
+  -- was unreliable and produced a big gap.) Row starts right of the logo (x=36).
+  local TitleRow = Custom:Create("Frame", {
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    Position = UDim2.new(0, 36, 0, 0),
+    Size = UDim2.new(0, 0, 1, 0),
+    AutomaticSize = Enum.AutomaticSize.X,
+    Name = "TitleRow"
+  }, Top)
+
+  Custom:Create("UIListLayout", {
+    FillDirection = Enum.FillDirection.Horizontal,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    VerticalAlignment = Enum.VerticalAlignment.Center,
+    HorizontalAlignment = Enum.HorizontalAlignment.Left,
+    Padding = UDim.new(0, 5),
+  }, TitleRow)
+
   -- Velium: named so the title-bar layout code can find them reliably
   -- (the old UIStroke-based identification broke once the stroke was removed).
   local TextLabel = Custom:Create("TextLabel", {
@@ -507,14 +530,13 @@ function Speed_Library:CreateWindow(Config)
     TextColor3 = Color3.fromRGB(255, 255, 255),
     TextSize = 14,
     TextXAlignment = Enum.TextXAlignment.Left,
-    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-    BackgroundTransparency = 0.9990000128746033,
-    BorderColor3 = Color3.fromRGB(0, 0, 0),
+    BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    Size = UDim2.new(1, -100, 1, 0),
-    Position = UDim2.new(0, 10, 0, 0),
+    Size = UDim2.new(0, 0, 1, 0),
+    AutomaticSize = Enum.AutomaticSize.X,
+    LayoutOrder = 1,
     Name = "WindowTitle"
-  }, Top)
+  }, TitleRow)
 
   Custom:Create("UICorner", {}, Top)
 
@@ -524,14 +546,13 @@ function Speed_Library:CreateWindow(Config)
     TextColor3 = Custom.ColorRGB,
     TextSize = 14,
     TextXAlignment = Enum.TextXAlignment.Left,
-    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-    BackgroundTransparency = 0.9990000128746033,
-    BorderColor3 = Color3.fromRGB(0, 0, 0),
+    BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    Size = UDim2.new(1, -120, 1, 0),
-    Position = UDim2.new(0, 10, 0, 0),
+    Size = UDim2.new(0, 0, 1, 0),
+    AutomaticSize = Enum.AutomaticSize.X,
+    LayoutOrder = 2,
     Name = "WindowDesc"
-  }, Top)
+  }, TitleRow)
 
   -- (sub-pixel UIStroke removed: it made the game-name label look fuzzy)
 
@@ -695,10 +716,10 @@ function Speed_Library:CreateWindow(Config)
 		if not Speed_Library.Unloaded then Speed_Library.Unloaded = true end
 	end)
 
-  -- Velium: TextBounds is 0 synchronously at creation, so defer the fit.
+  -- Velium: keep the shadow holder matched to the window size (was fit to the
+  -- title text width, which no longer matches the wider window).
   task.defer(function()
-    local w = 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X
-    DropShadowHolder.Size = UDim2.new(0, w, 0, 350)
+    DropShadowHolder.Size = SizeUi
   end)
 	MakeDraggable(Top, DropShadowHolder)
 
