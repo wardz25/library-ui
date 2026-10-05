@@ -4565,10 +4565,10 @@ end
 
 -- Point outerScroll to the Leveling container so it injects at LayoutOrder 1
 _G.HH_Shared.outerScroll = levelBox
-local gotL = loadExternalModule("Leveling", "https://raw.githubusercontent.com/wardz25/library-ui/main/modules/leveling.lua")
+local gotL = loadExternalModule("Leveling", "https://raw.githubusercontent.com/wardz25/library-ui/main/modules/leveling.lua?v=" .. VELIUM_BUILD)
 -- Point outerScroll to the Nightmare container so it injects at LayoutOrder 2
 _G.HH_Shared.outerScroll = nightmareBox
-local gotN = loadExternalModule("Nightmare", "https://raw.githubusercontent.com/wardz25/library-ui/main/modules/nightmare.lua")
+local gotN = loadExternalModule("Nightmare", "https://raw.githubusercontent.com/wardz25/library-ui/main/modules/nightmare.lua?v=" .. VELIUM_BUILD)
 -- Restore outerScroll to aScroll for any other use
 _G.HH_Shared.outerScroll = levelBox
 if not (gotL and gotN) then
