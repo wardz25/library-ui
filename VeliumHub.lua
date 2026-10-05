@@ -4619,4 +4619,9 @@ end)
 end
 end)
 notifyReady = true
+-- Velium: content was built while tabs were hidden (size read as 0); force a
+-- full re-measure now that every tab/section exists.
+task.defer(function()
+pcall(function() if speedTabs.RefreshAllSections then speedTabs:RefreshAllSections() end end)
+end)
 print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed4.", os.clock() - tStart, VELIUM_BUILD))

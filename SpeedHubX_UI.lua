@@ -2320,6 +2320,12 @@ function Speed_Library:CreateWindow(Config)
 
   Tabs._Main = Main -- Velium: resize grips attach here
   Tabs._Gui = SpeedHubXGui
+  -- Velium: re-measure every tab's sections (call once after all tabs are built).
+  function Tabs:RefreshAllSections()
+    for _, updaters in pairs(SectionUpdaters) do
+      for _, fn in ipairs(updaters) do pcall(fn) end
+    end
+  end
   return Tabs
 end
 
