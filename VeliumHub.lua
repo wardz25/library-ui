@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16i"
+local VELIUM_BUILD = "2026-09-16j"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -4686,4 +4686,4 @@ notifyReady = true
 task.defer(function()
 pcall(function() if speedTabs.RefreshAllSections then speedTabs:RefreshAllSections() end end)
 end)
-print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed5.", os.clock() - tStart, VELIUM_BUILD))
+print(string.format("[Velium Hub] Loaded successfully in %.2fs. Build %s-speed6.", os.clock() - tStart, VELIUM_BUILD))

@@ -1082,7 +1082,7 @@ function Speed_Library:CreateWindow(Config)
         CornerRadius = UDim.new(0, 2)
       }, SectionAdd)
     
-      Custom:Create("UIListLayout", {
+      local SectionAddLayout = Custom:Create("UIListLayout", {
         Padding = UDim.new(0, 3),
         SortOrder = Enum.SortOrder.LayoutOrder
       }, SectionAdd)
@@ -1107,9 +1107,11 @@ function Speed_Library:CreateWindow(Config)
           local SectionSizeYWitdh = 38
 
           -- Preferred: ask the layout engine for the real content height.
-          -- This is correct even when children use AutomaticSize (offset == 0),
-          -- which is what made PET TEAMS look clipped.
-          local contentH = SectionAdd.AbsoluteContentSize.Y
+          -- NOTE: AbsoluteContentSize is a UILayout property, NOT a GuiObject
+          -- one -- reading it off the Frame threw "AbsoluteContentSize is not
+          -- a valid member of Frame" on every call and left sections unsized.
+          local contentH = 0
+          pcall(function() contentH = SectionAddLayout.AbsoluteContentSize.Y end)
           if contentH ~= contentH or contentH == math.huge or contentH == -math.huge then contentH = 0 end
           if contentH > 0 then
             SectionSizeYWitdh = 38 + contentH + 3
