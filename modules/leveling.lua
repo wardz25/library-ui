@@ -88,11 +88,50 @@ lvTgtLvlInp.FocusLost:Connect(function()
  else lvTgtLvlInp.Text = tostring(D.leveling.targetLevel or 100) end
 end)
 
-local lvTgtRow = V:frame(lvScroll, UDim2.new(1,0,0,22), nil, T.BG, 1); lvTgtRow.LayoutOrder = 10
-local lvTgtLbl = V:label(lvTgtRow, "Target pets: "..#D.leveling.targets, UDim2.new(1,-90,1,0), UDim2.new(0,4,0,0), T.DIM, 9)
-lvTgtLbl.Font = Enum.Font.Gotham
-local lvOpenTgtBtn = V:button(lvTgtRow, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
-V:stroke(lvOpenTgtBtn, T.STROKE, 1)
+local lvSelectRow = S.selectRow
+
+local lvTgtSession
+local function lvUpdateTgtLbl() lvTgtSession.setValue("Target pets: "..#D.leveling.targets, #D.leveling.targets > 0) end
+lvTgtSession = lvSelectRow(lvScroll, 10, "Select Target Pets", {
+ placeholder = "Search pet name...",
+ getRows = function()
+  local inv = getInv(); local list = {}
+  for uuid in pairs(inv) do table.insert(list, uuid) end
+  table.sort(list, function(a,b) return getAge(a) < getAge(b) end)
+  local rows = {}
+  for _, uuid in ipairs(list) do
+   local d = inv[uuid]
+   if d then
+    local age = (d.PetData and d.PetData.Level) or 0
+    local base = (d.PetData and d.PetData.BaseWeight) or 0
+    local mutCode2 = (d.PetData and d.PetData.MutationType) or ""
+    local mutName2 = (mutCode2 ~= "" and mutCode2 ~= "m") and (" [".. (MUTATION_MAP[mutCode2] or mutCode2) .."]") or ""
+    local fav = isFav(uuid) and " ❤" or ""
+    table.insert(rows, {id = uuid, text = (d.PetType or "?") .. fav,
+     sub = string.format("Age %d | %.2f KG", age, getKG(uuid)),
+     search = (d.PetType or "") .. mutName2, selected = table.find(D.leveling.targets, uuid) ~= nil})
+   end
+  end
+  return rows
+ end,
+ onToggle = function(r)
+  local idx = table.find(D.leveling.targets, r.id)
+  if idx then table.remove(D.leveling.targets, idx) else table.insert(D.leveling.targets, r.id) end
+  saveD(); lvUpdateTgtLbl()
+ end,
+ selectAll = function(shown)
+  local allSel = #shown > 0
+  for _, r in ipairs(shown) do if not table.find(D.leveling.targets, r.id) then allSel = false; break end end
+  for _, r in ipairs(shown) do
+   local idx = table.find(D.leveling.targets, r.id)
+   if allSel then if idx then table.remove(D.leveling.targets, idx) end
+   elseif not idx then table.insert(D.leveling.targets, r.id) end
+  end
+  saveD(); lvUpdateTgtLbl()
+ end,
+ refresh = lvUpdateTgtLbl,
+})
+lvUpdateTgtLbl()
 
 local lvLogPanel = V:frame(lvScroll, UDim2.new(1,0,0,74), nil, T.PANEL); lvLogPanel.LayoutOrder = 11
 V:stroke(lvLogPanel, T.STROKE, 1)
@@ -148,84 +187,6 @@ lvDD2Btn.MouseButton1Click:Connect(function()
  end
 end)
 
-local lvTgtOverlay = V:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-lvTgtOverlay.Visible = false; lvTgtOverlay.ZIndex = 20
-local lvTgtHdr = V:frame(lvTgtOverlay, UDim2.new(1,0,0,26), nil, T.PANEL); V:stroke(lvTgtHdr, T.STROKE, 1)
-V:label(lvTgtHdr, "Select Target Pets", UDim2.new(1,-80,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local lvTgtSelAll = V:button(lvTgtHdr, "Select All", UDim2.new(0,64,0,20), UDim2.new(1,-118,0.5,-10), T.BTN, T.ACCENT, 8)
-V:stroke(lvTgtSelAll, T.STROKE, 1)
-local lvTgtClose = V:button(lvTgtHdr, "X", UDim2.new(0,24,0,20), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-V:stroke(lvTgtClose, T.ERROR, 1)
-lvTgtClose.MouseButton1Click:Connect(function() lvTgtOverlay.Visible = false; lvTgtLbl.Text = "Target pets: "..#D.leveling.targets end)
-local lvTgtSearch = V:input(lvTgtOverlay, "", "Search pet name...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,28))
-lvTgtSearch.TextColor3 = T.TEXT; lvTgtSearch.Font = Enum.Font.Gotham
-local lvTgtScroll = V:scroll(lvTgtOverlay, UDim2.new(1,0,1,-56), UDim2.new(0,0,0,54))
-V:list(lvTgtScroll, 3); V:pad(lvTgtScroll, 3, 4, 4, 3)
-
-local function lvGetFilteredUUIDs()
- local q = string.lower(lvTgtSearch.Text); local inv = getInv(); local list = {}
- for uuid in pairs(inv) do table.insert(list, uuid) end
- table.sort(list, function(a,b) return getAge(a) < getAge(b) end)
- local out = {}
- for _, uuid in ipairs(list) do
-  local d = inv[uuid]; if not d then continue end
-  if q == "" or string.lower(d.PetType or ""):find(q,1,true) then table.insert(out, uuid) end
- end
- return out
-end
-
-local function lvBuildTargetList()
- for _,c in ipairs(lvTgtScroll:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
- local inv = getInv(); local filtered = lvGetFilteredUUIDs()
- local allSel = #filtered > 0
- for _,uuid in ipairs(filtered) do if not table.find(D.leveling.targets, uuid) then allSel = false; break end end
- lvTgtSelAll.Text = (#filtered==0) and "Select All" or (allSel and "Unselect All" or "Select All")
- lvTgtSelAll.TextColor3 = allSel and T.SEL_TXT or T.ACCENT
- lvTgtSelAll.BackgroundColor3 = allSel and T.SEL_BG or T.BTN
- for i, uuid in ipairs(filtered) do
-  local d = inv[uuid]; if not d then continue end
-  local isSel = table.find(D.leveling.targets, uuid) ~= nil
-  local age = d.PetData and (d.PetData.Level or 0) or 0
-  local kg = getKG(uuid)
-  local base = d.PetData and (d.PetData.BaseWeight or 0) or 0
-  local fv = isFav(uuid) and " ❤" or ""
-  local mutCode2 = d.PetData and (d.PetData.MutationType or "") or ""
-  local mutName2 = (mutCode2 ~= "" and mutCode2 ~= "m") and (" [".. (MUTATION_MAP[mutCode2] or mutCode2) .."]") or ""
-  local mutDisplay = mutName2 ~= "" and string.format('<font color="rgb(180,160,255)">%s</font>', mutName2) or ""
-  local txt = string.format("%s%s%s | Age %d | %.2f KG | Base %.2f", d.PetType or "?", mutDisplay, fv, age, kg, base)
-  local row = V:button(lvTgtScroll, txt, UDim2.new(1,0,0,22), nil,
-   isSel and T.SEL_BG or Color3.fromRGB(13,13,13), isSel and T.SEL_TXT or T.TEXT, 9)
-  row.LayoutOrder = i; row:SetAttribute("uuid", uuid)
-  row.TextXAlignment = Enum.TextXAlignment.Left
-  V:pad(row, 0, 8, 4, 0); V:stroke(row, isSel and T.ACCENT or T.STROKE, 1)
-  row.MouseButton1Click:Connect(function()
-   local idx = table.find(D.leveling.targets, uuid)
-   if idx then table.remove(D.leveling.targets, idx) else table.insert(D.leveling.targets, uuid) end
-   saveD(); lvTgtLbl.Text = "Target pets: "..#D.leveling.targets
-   local isSel2 = table.find(D.leveling.targets, uuid) ~= nil
-   V:updateRowVisual(row, isSel2, T.SEL_BG, T.SEL_TXT, Color3.fromRGB(13,13,13), T.TEXT, T.ACCENT, T.STROKE)
-  end)
- end
-end
-
-lvTgtSelAll.MouseButton1Click:Connect(function()
- local filtered = lvGetFilteredUUIDs()
- local allSel = #filtered > 0
- for _,uuid in ipairs(filtered) do if not table.find(D.leveling.targets, uuid) then allSel = false; break end end
- if allSel then
-  for _,uuid in ipairs(filtered) do
-   local idx = table.find(D.leveling.targets, uuid); if idx then table.remove(D.leveling.targets, idx) end
-  end
- else
-  for _,uuid in ipairs(filtered) do
-   if not table.find(D.leveling.targets, uuid) then table.insert(D.leveling.targets, uuid) end
-  end
- end
- saveD(); lvTgtLbl.Text = "Target pets: "..#D.leveling.targets; lvBuildTargetList()
-end)
-lvTgtSearch:GetPropertyChangedSignal("Text"):Connect(lvBuildTargetList)
-lvOpenTgtBtn.MouseButton1Click:Connect(function() lvTgtOverlay.Visible = true; lvBuildTargetList() end)
-
 local function lvCleanTargets()
  local inv = getInv(); local cleaned = {}
  for _, uuid in ipairs(D.leveling.targets) do if inv[uuid] then table.insert(cleaned, uuid) end end
@@ -269,7 +230,7 @@ local function startLeveling(tog)
    if ageNow >= targetLvl then
     lvAddLog(string.format("Already Lv%d, skip", targetLvl), T.DIM)
     local i = table.find(D.leveling.targets, targetUUID); if i then table.remove(D.leveling.targets, i); saveD() end
-    lvTgtLbl.Text = "Target pets: "..#D.leveling.targets
+    lvUpdateTgtLbl()
     continue
    end
 
@@ -284,7 +245,7 @@ local function startLeveling(tog)
     if not getInv()[targetUUID] then
      lvAddLog(string.format("%s removed from inventory", petName), T.ERROR)
      local i = table.find(D.leveling.targets, targetUUID); if i then table.remove(D.leveling.targets, i); saveD() end
-     lvTgtLbl.Text = "Target pets: "..#D.leveling.targets
+     lvUpdateTgtLbl()
      unequipAll(); break
     end
     local age2 = getAge(targetUUID)
@@ -310,7 +271,7 @@ local function startLeveling(tog)
      lvAddLog(string.format("DONE  %s  Lv%d  (%s)", petName, targetLvl, UI.fmtTime(elapsed)), T.SUCCESS)
      lvSetStatus(string.format("%s done! %s", petName, UI.fmtTime(elapsed)), T.SUCCESS)
      local i = table.find(D.leveling.targets, targetUUID); if i then table.remove(D.leveling.targets, i); saveD() end
-     lvTgtLbl.Text = "Target pets: "..#D.leveling.targets
+     lvUpdateTgtLbl()
      local fkg = 0; pcall(function() fkg = getKG(targetUUID) end)
      pcall(function()
       if S.sendPetFinishedWebhook then

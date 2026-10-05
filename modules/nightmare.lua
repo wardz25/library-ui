@@ -190,12 +190,6 @@ nmThreshInp.FocusLost:Connect(function()
  else nmThreshInp.Text = tostring(D.autoNM.lvThresh) end
 end)
 
-local nmTgtRow = V:frame(nmInner, UDim2.new(1,0,0,22), nil, T.BG, 1); nmTgtRow.LayoutOrder = 8
-local nmTgtLbl = V:label(nmTgtRow, "Target pets: " .. #D.autoNM.targets, UDim2.new(1,-90,1,0), UDim2.new(0,4,0,0), T.DIM, 9)
-nmTgtLbl.Font = Enum.Font.Gotham
-local nmOpenTgtBtn = V:button(nmTgtRow, "Select pets >", UDim2.new(0,84,0,20), UDim2.new(1,-86,0.5,-10), T.BTN, T.ACCENT, 9)
-V:stroke(nmOpenTgtBtn, T.STROKE, 1)
-
 local nmLogPanel = V:frame(nmInner, UDim2.new(1,0,0,74), nil, T.PANEL); nmLogPanel.LayoutOrder = 9
 V:stroke(nmLogPanel, T.STROKE, 1)
 local nmLogHdr = V:frame(nmLogPanel, UDim2.new(1,0,0,18), nil, T.BG, 1)
@@ -250,54 +244,48 @@ nmHsBtn.MouseButton1Click:Connect(function()
  end
 end)
 
-local nmTgtOverlay = V:frame(modalRoot, UDim2.new(1,0,1,0), nil, T.BG)
-nmTgtOverlay.Visible = false; nmTgtOverlay.ZIndex = 20
-local nmTgtHdr = V:frame(nmTgtOverlay, UDim2.new(1,0,0,26), nil, T.PANEL); V:stroke(nmTgtHdr, T.STROKE, 1)
-V:label(nmTgtHdr, "Select Target Pets (Nightmare)", UDim2.new(1,-36,1,0), UDim2.new(0,8,0,0), T.ACCENT, 10)
-local nmTgtClose = V:button(nmTgtHdr, "X", UDim2.new(0,24,0,20), UDim2.new(1,-28,0.5,-11), T.ERROR, T.TEXT, 10)
-V:stroke(nmTgtClose, T.ERROR, 1)
-nmTgtClose.MouseButton1Click:Connect(function()
- nmTgtOverlay.Visible = false
- nmTgtLbl.Text = "Target pets: " .. #D.autoNM.targets
-end)
-local nmTgtSearch = V:input(nmTgtOverlay, "", "Search pet...", UDim2.new(1,-8,0,22), UDim2.new(0,4,0,28))
-nmTgtSearch.TextColor3 = T.TEXT; nmTgtSearch.Font = Enum.Font.Gotham
-local nmTgtScroll = V:scroll(nmTgtOverlay, UDim2.new(1,0,1,-56), UDim2.new(0,0,0,54))
-V:list(nmTgtScroll, 3); V:pad(nmTgtScroll, 3,4,4,3)
+local nmSelectRow = S.selectRow
 
-local function nmBuildTgtList()
- for _, c in ipairs(nmTgtScroll:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
- local inv = getInv(); local q = string.lower(nmTgtSearch.Text)
- local list = {}
- for uuid in pairs(inv) do table.insert(list, uuid) end
- table.sort(list, function(a,b) return getKG(a) > getKG(b) end)
- for i, uuid in ipairs(list) do
-  local d = inv[uuid]; if not d then continue end
-  if q ~= "" and not string.lower(d.PetType or ""):find(q,1,true) then continue end
-  local isSel = table.find(D.autoNM.targets, uuid) ~= nil
-  local age = d.PetData and (d.PetData.Level or 0) or 0
-  local kg  = getKG(uuid)
-  local mut = nmGetMut(uuid)
-  local mutTxt = mut and (" [" .. (MUTATION_MAP[mut] or mut) .. "]") or ""
-  local mutDisplay = mutTxt ~= "" and string.format('<font color="rgb(180,160,255)">%s</font>', mutTxt) or ""
-  local txt = string.format("[%s%s] | Age %d | %.2f KG", d.PetType or "?", mutDisplay, age, kg)
-  local row = V:button(nmTgtScroll, txt, UDim2.new(1,0,0,22), nil,
-   isSel and T.SEL_BG or Color3.fromRGB(13,13,13), isSel and T.SEL_TXT or T.TEXT, 9)
-  row.LayoutOrder = i; row:SetAttribute("uuid", uuid)
-  row.TextXAlignment = Enum.TextXAlignment.Left
-  V:pad(row, 0,8,4,0); V:stroke(row, isSel and T.ACCENT or T.STROKE, 1)
-  row.MouseButton1Click:Connect(function()
-   local idx = table.find(D.autoNM.targets, uuid)
-   if idx then table.remove(D.autoNM.targets, idx)
-   else table.insert(D.autoNM.targets, uuid) end
-   saveD(); nmTgtLbl.Text = "Target pets: " .. #D.autoNM.targets
-   V:updateRowVisual(row, table.find(D.autoNM.targets,uuid)~=nil,
-    T.SEL_BG,T.SEL_TXT,Color3.fromRGB(13,13,13),T.TEXT,T.ACCENT,T.STROKE)
-  end)
- end
-end
-nmTgtSearch:GetPropertyChangedSignal("Text"):Connect(nmBuildTgtList)
-nmOpenTgtBtn.MouseButton1Click:Connect(function() nmTgtOverlay.Visible = true; nmBuildTgtList() end)
+local nmTgtSession
+local function nmUpdateTgtLbl() nmTgtSession.setValue("Target pets: " .. #D.autoNM.targets, #D.autoNM.targets > 0) end
+nmTgtSession = nmSelectRow(nmInner, 8, "Select Target Pets", {
+ placeholder = "Search pet...",
+ getRows = function()
+  local inv = getInv(); local list = {}
+  for uuid in pairs(inv) do table.insert(list, uuid) end
+  table.sort(list, function(a,b) return getKG(a) > getKG(b) end)
+  local rows = {}
+  for _, uuid in ipairs(list) do
+   local d = inv[uuid]
+   if d then
+    local age = (d.PetData and d.PetData.Level) or 0
+    local mut = nmGetMut(uuid)
+    local mutTxt = mut and (" [" .. (MUTATION_MAP[mut] or mut) .. "]") or ""
+    table.insert(rows, {id = uuid, text = d.PetType or "?",
+     sub = string.format("Age %d | %.2f KG", age, getKG(uuid)),
+     search = (d.PetType or "") .. mutTxt, selected = table.find(D.autoNM.targets, uuid) ~= nil})
+   end
+  end
+  return rows
+ end,
+ onToggle = function(r)
+  local idx = table.find(D.autoNM.targets, r.id)
+  if idx then table.remove(D.autoNM.targets, idx) else table.insert(D.autoNM.targets, r.id) end
+  saveD(); nmUpdateTgtLbl()
+ end,
+ selectAll = function(shown)
+  local allSel = #shown > 0
+  for _, r in ipairs(shown) do if not table.find(D.autoNM.targets, r.id) then allSel = false; break end end
+  for _, r in ipairs(shown) do
+   local idx = table.find(D.autoNM.targets, r.id)
+   if allSel then if idx then table.remove(D.autoNM.targets, idx) end
+   elseif not idx then table.insert(D.autoNM.targets, r.id) end
+  end
+  saveD(); nmUpdateTgtLbl()
+ end,
+ refresh = nmUpdateTgtLbl,
+})
+nmUpdateTgtLbl()
 
 local function nmRunLoop(logFn, setStatusFn)
  local lvUUIDs = getTeamUUIDs(D.autoNM.lvTeam)
@@ -448,7 +436,7 @@ local function nmRunLoop(logFn, setStatusFn)
   if gotNightmare then
    local idx2 = table.find(D.autoNM.targets, targetUUID)
    if idx2 then table.remove(D.autoNM.targets, idx2); saveD() end
-   nmTgtLbl.Text = "Target pets: " .. #D.autoNM.targets
+   nmUpdateTgtLbl()
    logFn("Next pet...", T.DIM)
    task.wait(1)
   end

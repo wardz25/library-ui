@@ -35,7 +35,7 @@ local function prefetchAwait(key, timeout)
 end
 -- Bump this on every push: it cache-busts the inner fetches so a stale
 -- raw-CDN copy of the UI library can never be served to a client.
-local VELIUM_BUILD = "2026-09-16n"
+local VELIUM_BUILD = "2026-09-16o"
 local LIB_URL  = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/VeliumMainLibrary.lua?v=" .. VELIUM_BUILD
 local UI_URL   = "https://raw.githubusercontent.com/wardz25/library-ui/refs/heads/main/SpeedHubX_UI.lua?v=" .. VELIUM_BUILD
 local PETS_URL = "https://raw.githubusercontent.com/Punpunzero02/updater/refs/heads/main/pets.json"
@@ -1626,9 +1626,13 @@ local function pickerOpen(session)
 	pickerBuild()
 end
 
--- Builds a dropdown-looking trigger row in a section and returns a session with
+-- Builds a dropdown-looking trigger row and returns a session with
 -- `setValue(text, active)` so call sites can reflect the current selection.
+-- `sec` may be a Speed section item (uses its GetContainer) or a raw GuiObject
+-- frame (used by the external leveling/nightmare modules).
 local function spSelectRow(sec, order, title, cfg)
+	local parent = sec
+	if type(sec) == "table" and sec.GetContainer then parent = sec:GetContainer() end
 	local session = {
 		title = title,
 		placeholder = cfg.placeholder,
@@ -1638,8 +1642,7 @@ local function spSelectRow(sec, order, title, cfg)
 		closeOnPick = cfg.closeOnPick,
 		refresh = cfg.refresh,
 	}
-	local container = sec:GetContainer()
-	local row = UI:frame(container, UDim2.new(1, 0, 0, 36), nil, Color3.fromRGB(255, 255, 255), 0.935)
+	local row = UI:frame(parent, UDim2.new(1, 0, 0, 36), nil, Color3.fromRGB(255, 255, 255), 0.935)
 	row.LayoutOrder = order; row.Name = "VeliumSelectRow"
 	UI:corner(row, 4)
 	local tl = UI:label(row, title, UDim2.new(1, -180, 1, 0), UDim2.new(0, 12, 0, 0), Color3.fromRGB(231, 231, 231), 13)
@@ -1660,6 +1663,9 @@ local function spSelectRow(sec, order, title, cfg)
 	end
 	return session
 end
+-- Velium: expose the picker row builder so external modules (leveling/nightmare)
+-- can replace their own fullscreen overlays with the shared centered panel.
+_G._VeliumSelectRow = spSelectRow
 do
 local topF = mainFrame:FindFirstChild("Top")
 if topF then
@@ -3109,6 +3115,7 @@ _G.HH_Shared = {
 	PageLeveling = nil,     -- assigned after AUTOMATION tab exists
 	modalRoot = modalRoot,  -- fullscreen modal layer for module overlays
 	_buildTeamDD = buildTeamDD, getTeamUUIDs = getTeamUUIDs,
+	selectRow = spSelectRow,  -- shared centered picker-row builder for modules
 }
 end
 -- NOTE: AutoLeveling / AutoNightmare loadstring calls moved to the end of the AUTOMATION tab
