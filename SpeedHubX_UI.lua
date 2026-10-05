@@ -862,6 +862,9 @@ function Speed_Library:CreateWindow(Config)
   function Tabs:CreateTab(Config)
     local _Name = Config[1] or Config.Name or "" 
     local Icon = Config[2] or Config.Icon or ""
+    -- Velium: the sidebar label may carry a leading "| " separator (e.g.
+    -- "| Hatch"); the big page header should not show it.
+    local _Header = string.gsub(_Name, "^%s*|%s*", "")
     
     local ScrolLayers = Custom:Create("ScrollingFrame", {
 			ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80),
@@ -974,7 +977,7 @@ function Speed_Library:CreateWindow(Config)
 
     if CountTab == 0 then
       LayersPageLayout:JumpToIndex(0)
-      NameTab.Text = _Name
+      NameTab.Text = _Header
   
       local ChooseFrame = Custom:Create("Frame", {
         BackgroundColor3 = Custom.ColorRGB,
@@ -1033,7 +1036,7 @@ function Speed_Library:CreateWindow(Config)
         end
   
         task.wait(0.05)
-        NameTab.Text = _Name
+        NameTab.Text = _Header
   
         TweenService:Create(FrameChoose, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {Size = UDim2.new(0, 1, 0, 20)}):Play()
   
